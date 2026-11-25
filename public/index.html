@@ -162,61 +162,56 @@
     </div>
   </div>
 
-  <script>
-    const session = JSON.parse(localStorage.getItem("samsuspulse_user") || localStorage.getItem("nexuspulse_user") || "null");
-    if (!session) {
-      window.location.href = "/login.html";
-    } else {
-      document.getElementById("userName").textContent = session.username || session.name || "Member";
-      document.getElementById("userRole").textContent = session.role || "Member";
-    }
+<script>
+  const session = JSON.parse(localStorage.getItem("samsuspulse_user") || "null");
+  if (!session) {
+    window.location.href = "/login.html";
+  } else {
+    document.getElementById("userName").textContent = session.username || session.name || "Member";
+    document.getElementById("userRole").textContent = session.role || "Member";
+  }
 
-    document.getElementById("logoutBtn").addEventListener("click", () => {
-      localStorage.removeItem("samsuspulse_user");
-      localStorage.removeItem("nexuspulse_user");
-      window.location.href = "/login.html";
-    });
+  document.getElementById("logoutBtn").addEventListener("click", () => {
+    localStorage.removeItem("samsuspulse_user");
+    window.location.href = "/login.html";
+  });
 
-    async function loadPosts() {
-      const feedList = document.getElementById("feedList");
-      try {
-        const res = await fetch("/.netlify/functions/auth", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "get_posts" })
-        });
-        const data = await res.json();
-        const posts = data.posts || [];
-        document.getElementById("postCount").textContent = posts.length;
+  async function loadPosts() {
+    const feedList = document.getElementById("feedList");
+    try {
+      const res = await fetch("/api/posts");
+      const data = await res.json();
+      const posts = data.posts || [];
+      document.getElementById("postCount").textContent = posts.length;
 
-        if (!posts.length) {
-          feedList.innerHTML = `<div class="empty">No posts yet. Click <strong>+ Live Board Publisher</strong> to create the first update!</div>`;
-          return;
-        }
-
-        feedList.innerHTML = posts.map(p => `
-          <article class="post-card">
-            <div class="post-meta">
-              <span><strong>${escapeHtml(p.author || "Member")}</strong> <span class="role-pill">${escapeHtml(p.role || "Member")}</span></span>
-              <span>${escapeHtml(p.timestamp || "")}</span>
-            </div>
-            <div class="post-title">${escapeHtml(p.title)}</div>
-            <div class="post-body">${escapeHtml(p.content)}</div>
-          </article>
-        `).join("");
-      } catch (err) {
-        feedList.innerHTML = `<div class="empty">Could not load live board posts right now.</div>`;
+      if (!posts.length) {
+        feedList.innerHTML = `<div class="empty">No posts yet. Click <strong>+ Live Board Publisher</strong> to create the first update!</div>`;
+        return;
       }
-    }
 
-    function escapeHtml(str) {
-      return String(str).replace(/[&<>"']/g, m => ({
-        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-      }[m]));
+      feedList.innerHTML = posts.map(p => `
+        <article class="post-card">
+          <div class="post-meta">
+            <span><strong>${escapeHtml(p.author || "Member")}</strong> <span class="role-pill">${escapeHtml(p.role || "Member")}</span></span>
+            <span>${escapeHtml(p.timestamp || "")}</span>
+          </div>
+          <div class="post-title">${escapeHtml(p.title)}</div>
+          <div class="post-body">${escapeHtml(p.content)}</div>
+        </article>
+      `).join("");
+    } catch (err) {
+      feedList.innerHTML = `<div class="empty">Could not load live board posts right now.</div>`;
     }
+  }
 
-    document.getElementById("refreshBtn").addEventListener("click", loadPosts);
-    loadPosts();
-  </script>
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, m => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[m]));
+  }
+
+  document.getElementById("refreshBtn").addEventListener("click", loadPosts);
+  loadPosts();
+</script>
 </body>
 </html>
