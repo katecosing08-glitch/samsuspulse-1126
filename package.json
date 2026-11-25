@@ -1,8 +1,12 @@
 {
-  "name": "nexuspulse-portal",
+  "name": "samsuspulse",
   "version": "1.0.0",
-  "type": "module",
+  "description": "SamsusPulse Dashboard and Live Board Publisher with Express.js backend",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
-    "@netlify/blobs": "^8.0.0"
+    "express": "^4.21.0"
   }
 }
