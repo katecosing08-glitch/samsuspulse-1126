@@ -1,4 +1,4 @@
-<<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -149,8 +149,7 @@
     .empty { text-align: center; color: var(--muted); padding: 40px 20px; background: var(--card); border-radius: 16px; }
   </style>
 </head>
-<body>
-  <body style="display: none;">
+<body style="display: none;">
   <div class="container">
     <header class="topbar">
       <div class="brand">Samsus<span>Pulse</span> <small>// Dashboard</small></div>
@@ -196,56 +195,57 @@
     </div>
   </div>
 
-<script>
-  const session = JSON.parse(localStorage.getItem("samsuspulse_user") || "null");
-if (!session) {
-  window.location.replace("/login.html");
-} else {
-  document.body.style.display = "";
-  document.getElementById("username").textContent = session.username || session.name || "Member";
-}
-
-  document.getElementById("logoutBtn").addEventListener("click", () => {
-    localStorage.removeItem("samsuspulse_user");
-    window.location.href = "/login.html";
-  });
-
-  async function loadPosts() {
-    const feedList = document.getElementById("feedList");
-    try {
-      const res = await fetch("/api/posts");
-      const data = await res.json();
-      const posts = data.posts || [];
-      document.getElementById("postCount").textContent = posts.length;
-
-      if (!posts.length) {
-        feedList.innerHTML = `<div class="empty">No posts yet. Click <strong>+ Live Board Publisher</strong> to create the first update!</div>`;
-        return;
-      }
-
-      feedList.innerHTML = posts.map(p => `
-        <article class="post-card">
-          <div class="post-meta">
-            <span><strong>${escapeHtml(p.author || "Member")}</strong> <span class="role-pill">${escapeHtml(p.role || "Member")}</span></span>
-            <span>${escapeHtml(p.timestamp || "")}</span>
-          </div>
-          <div class="post-title">${escapeHtml(p.title)}</div>
-          <div class="post-body">${escapeHtml(p.content)}</div>
-        </article>
-      `).join("");
-    } catch (err) {
-      feedList.innerHTML = `<div class="empty">Could not load live board posts right now.</div>`;
+  <script>
+    const session = JSON.parse(localStorage.getItem("samsuspulse_user") || "null");
+    if (!session) {
+      window.location.replace("/login.html");
+    } else {
+      document.body.style.display = "";
+      document.getElementById("userName").textContent = session.username || session.name || "Member";
+      document.getElementById("userRole").textContent = session.role || "Member";
     }
-  }
 
-  function escapeHtml(str) {
-    return String(str).replace(/[&<>"']/g, m => ({
-      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-    }[m]));
-  }
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+      localStorage.removeItem("samsuspulse_user");
+      window.location.href = "/login.html";
+    });
 
-  document.getElementById("refreshBtn").addEventListener("click", loadPosts);
-  loadPosts();
-</script>
+    async function loadPosts() {
+      const feedList = document.getElementById("feedList");
+      try {
+        const res = await fetch("/api/posts");
+        const data = await res.json();
+        const posts = data.posts || [];
+        document.getElementById("postCount").textContent = posts.length;
+
+        if (!posts.length) {
+          feedList.innerHTML = `<div class="empty">No posts yet. Click <strong>+ Live Board Publisher</strong> to create the first update!</div>`;
+          return;
+        }
+
+        feedList.innerHTML = posts.map(p => `
+          <article class="post-card">
+            <div class="post-meta">
+              <span><strong>${escapeHtml(p.author || "Member")}</strong> <span class="role-pill">${escapeHtml(p.role || "Member")}</span></span>
+              <span>${escapeHtml(p.timestamp || "")}</span>
+            </div>
+            <div class="post-title">${escapeHtml(p.title)}</div>
+            <div class="post-body">${escapeHtml(p.content)}</div>
+          </article>
+        `).join("");
+      } catch (err) {
+        feedList.innerHTML = `<div class="empty">Could not load live board posts right now.</div>`;
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, m => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[m]));
+    }
+
+    document.getElementById("refreshBtn").addEventListener("click", loadPosts);
+    loadPosts();
+  </script>
 </body>
 </html>
