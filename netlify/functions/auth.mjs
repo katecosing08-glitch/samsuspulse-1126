@@ -6,7 +6,7 @@ function hashPassword(password) {
 }
 
 export default async (req) => {
-  const store = getStore("nexuspulse-db");
+  const store = getStore("samuspulse-db");
 
   // Handle GET requests (Fetch public dashboard feed)
   if (req.method === "GET") {
@@ -15,7 +15,7 @@ export default async (req) => {
         id: 1,
         author: "System Admin",
         role: "Project Lead",
-        title: "Welcome to NexusPulse 1126!",
+        title: "Welcome to SamsusPulse Project!",
         content: "This full-stack workspace runs on Netlify Functions & Blobs. Sign up to post your own project updates!",
         timestamp: new Date().toLocaleDateString()
       }
