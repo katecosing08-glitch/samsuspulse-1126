@@ -235,62 +235,63 @@
   </div>
 
   <script>
-    // Redirect to dashboard if already logged in
-    if (localStorage.getItem("samsuspulse_user")) {
-      window.location.href = "/index.html";
-    }
+  // Redirect to dashboard if already logged in
+  if (localStorage.getItem("samsuspulse_user")) {
+    window.location.href = "/index.html";
+  }
 
-    let mode = "login";
+  let mode = "login";
 
-    function switchMode(newMode) {
-      mode = newMode;
-      document.getElementById("tab-login").classList.toggle("active", mode === "login");
-      document.getElementById("tab-signup").classList.toggle("active", mode === "signup");
-      document.getElementById("signup-fields").classList.toggle("hidden", mode === "login");
-      document.getElementById("submit-btn").textContent = mode === "login" ? "Access Dashboard" : "Create Cloud Account";
-      document.getElementById("status-msg").textContent = "";
-    }
+  function switchMode(newMode) {
+    mode = newMode;
+    document.getElementById("tab-login").classList.toggle("active", mode === "login");
+    document.getElementById("tab-signup").classList.toggle("active", mode === "signup");
+    document.getElementById("signup-fields").classList.toggle("hidden", mode === "login");
+    document.getElementById("submit-btn").textContent =
+      mode === "login" ? "Access Dashboard" : "Create Cloud Account";
+    document.getElementById("status-msg").textContent = "";
+  }
 
-    document.getElementById("auth-form").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const statusEl = document.getElementById("status-msg");
-      const btn = document.getElementById("submit-btn");
-      statusEl.className = "status";
-      statusEl.textContent = "Connecting to server...";
-      btn.disabled = true;
+  document.getElementById("auth-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const statusEl = document.getElementById("status-msg");
+    const btn = document.getElementById("submit-btn");
+    statusEl.className = "status";
+    statusEl.textContent = "Connecting to server...";
+    btn.disabled = true;
 
-      const payload = {
-        action: mode,
-        email: document.getElementById("email").value,
-        password: document.getElementById("password").value,
-        name: document.getElementById("name").value,
-        role: document.getElementById("role").value
-      };
+    const endpoint = mode === "signup" ? "/api/signup" : "/api/login";
+    const payload = {
+      email: document.getElementById("email").value,
+      password: document.getElementById("password").value,
+      name: document.getElementById("name").value,
+      role: document.getElementById("role").value
+    };
 
-      try {
-        const res = await fetch("/.netlify/functions/auth", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        const data = await res.json();
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
 
-        if (!res.ok) {
-          statusEl.className = "status error";
-          statusEl.textContent = data.error || "Authentication failed.";
-        } else {
-          statusEl.className = "status success";
-          statusEl.textContent = data.message + " Redirecting...";
-          localStorage.setItem("samsuspulse_user", JSON.stringify(data.user));
-          setTimeout(() => (window.location.href = "/index.html"), 700);
-        }
-      } catch (err) {
+      if (!res.ok) {
         statusEl.className = "status error";
-        statusEl.textContent = "Network error. Deploy on Netlify to activate backend functions.";
-      } finally {
-        btn.disabled = false;
+        statusEl.textContent = data.error || "Authentication failed.";
+      } else {
+        statusEl.className = "status success";
+        statusEl.textContent = (data.message || "Success!") + " Redirecting...";
+        localStorage.setItem("samsuspulse_user", JSON.stringify(data.user));
+        setTimeout(() => (window.location.href = "/index.html"), 700);
       }
-    });
-  </script>
+    } catch (err) {
+      statusEl.className = "status error";
+      statusEl.textContent = "Network error. Make sure the Express server is running.";
+    } finally {
+      btn.disabled = false;
+    }
+  });
+</script>
 </body>
 </html>
