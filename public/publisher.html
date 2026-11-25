@@ -157,7 +157,7 @@
 <script>
   const session = JSON.parse(localStorage.getItem("samsuspulse_user") || "null");
   if (!session) {
-    window.location.href = "/login.html";
+    window.location.replace("/login.html");
   } else {
     document.getElementById("authorInfo").textContent =
       `Publishing as ${session.username || session.name} (${session.role || "Member"})`;
@@ -206,6 +206,9 @@
       btn.textContent = "Publish to Live Board";
     }
   });
+</script>
+</body>
+</html>
 </script>
 </body>
 </html>
