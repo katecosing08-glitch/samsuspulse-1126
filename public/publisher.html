@@ -154,59 +154,58 @@
     </form>
   </main>
 
-  <script>
-    const session = JSON.parse(localStorage.getItem("samsuspulse_user") || localStorage.getItem("nexuspulse_user") || "null");
-    if (!session) {
-      window.location.href = "/login.html";
-    } else {
-      document.getElementById("authorInfo").textContent = `Publishing as ${session.username || session.name} (${session.role || "Member"})`;
+<script>
+  const session = JSON.parse(localStorage.getItem("samsuspulse_user") || "null");
+  if (!session) {
+    window.location.href = "/login.html";
+  } else {
+    document.getElementById("authorInfo").textContent =
+      `Publishing as ${session.username || session.name} (${session.role || "Member"})`;
+  }
+
+  document.getElementById("logoutBtn").addEventListener("click", () => {
+    localStorage.removeItem("samsuspulse_user");
+    window.location.href = "/login.html";
+  });
+
+  document.getElementById("publishForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("submitBtn");
+    const status = document.getElementById("statusMsg");
+    const title = document.getElementById("postTitle").value;
+    const content = document.getElementById("postContent").value;
+
+    btn.disabled = true;
+    btn.textContent = "Publishing...";
+    status.textContent = "";
+
+    try {
+      const res = await fetch("/api/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          author: session.username || session.name || "Member",
+          role: session.role || "Member",
+          title,
+          content
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to publish.");
+
+      status.style.color = "#4ade80";
+      status.textContent = "Published! Redirecting to Dashboard...";
+      setTimeout(() => {
+        window.location.href = "/index.html";
+      }, 900);
+    } catch (err) {
+      status.style.color = "#f87171";
+      status.textContent = err.message;
+      btn.disabled = false;
+      btn.textContent = "Publish to Live Board";
     }
-
-    document.getElementById("logoutBtn").addEventListener("click", () => {
-      localStorage.removeItem("samsuspulse_user");
-      localStorage.removeItem("nexuspulse_user");
-      window.location.href = "/login.html";
-    });
-
-    document.getElementById("publishForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const btn = document.getElementById("submitBtn");
-      const status = document.getElementById("statusMsg");
-      const title = document.getElementById("postTitle").value;
-      const content = document.getElementById("postContent").value;
-
-      btn.disabled = true;
-      btn.textContent = "Publishing...";
-      status.textContent = "";
-
-      try {
-        const res = await fetch("/.netlify/functions/auth", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "add_post",
-            author: session.username || session.name || "Member",
-            role: session.role || "Member",
-            title,
-            content
-          })
-        });
-
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to publish.");
-
-        status.style.color = "#4ade80";
-        status.textContent = "Published! Redirecting to Dashboard...";
-        setTimeout(() => {
-          window.location.href = "/index.html";
-        }, 900);
-      } catch (err) {
-        status.style.color = "#f87171";
-        status.textContent = err.message;
-        btn.disabled = false;
-        btn.textContent = "Publish to Live Board";
-      }
-    });
-  </script>
+  });
+</script>
 </body>
 </html>
