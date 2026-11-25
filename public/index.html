@@ -198,12 +198,12 @@
 
 <script>
   const session = JSON.parse(localStorage.getItem("samsuspulse_user") || "null");
-  if (!session) {
-    window.location.href = "/login.html";
-  } else {
-    document.getElementById("userName").textContent = session.username || session.name || "Member";
-    document.getElementById("userRole").textContent = session.role || "Member";
-  }
+if (!session) {
+  window.location.replace("/login.html");
+} else {
+  document.body.style.display = "";
+  document.getElementById("username").textContent = session.username || session.name || "Member";
+}
 
   document.getElementById("logoutBtn").addEventListener("click", () => {
     localStorage.removeItem("samsuspulse_user");
