@@ -87,6 +87,28 @@
     .stat-label { color: var(--muted); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.5px; }
     .stat-value { font-size: 1.4rem; font-weight: 700; margin-top: 6px; color: var(--gold); }
 
+    .about-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--gold);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+
+    .about-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .about-title { font-size: 1.05rem; color: var(--gold); }
+    .about-tag { font-size: 0.78rem; color: var(--muted); }
+    .about-body { color: #d1d5db; font-size: 0.94rem; line-height: 1.6; }
+
     .feed-header {
       display: flex;
       justify-content: space-between;
@@ -151,6 +173,16 @@
         <div class="stat-label">Live Board Posts</div>
         <div class="stat-value" id="postCount">0</div>
       </div>
+    </section>
+
+    <section class="about-card" id="aboutSection">
+      <div class="about-header">
+        <h2 class="about-title">About SamsusPulse</h2>
+        <span class="about-tag">Express.js Live Board</span>
+      </div>
+      <p class="about-body">
+        SamsusPulse is a live community board and announcement dashboard powered by a Node.js and Express.js backend. Members can sign in, view real-time board updates, and publish new announcements through the Live Board Publisher.
+      </p>
     </section>
 
     <div class="feed-header">
