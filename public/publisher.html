@@ -184,11 +184,12 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          author: session.username || session.name || "Member",
-          role: session.role || "Member",
-          title,
-          content
-        })
+  author: session.username || session.name || session.email,
+  authorEmail: session.email || "",
+  role: session.role || "Member",
+  title,
+  content
+})
       });
 
       const data = await res.json();
@@ -206,9 +207,6 @@
       btn.textContent = "Publish to Live Board";
     }
   });
-</script>
-</body>
-</html>
 </script>
 </body>
 </html>
