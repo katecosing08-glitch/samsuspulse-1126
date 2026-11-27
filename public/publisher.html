@@ -62,7 +62,7 @@
       transition: 0.2s;
     }
 
-    .btn:hover { border-color: var(--gold); color: var(--gold); }
+    .btn:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
 
     .btn-primary {
       background: linear-gradient(135deg, var(--crimson), var(--wine));
@@ -71,7 +71,13 @@
       box-shadow: 0 6px 20px rgba(220, 20, 60, 0.35);
     }
 
-    .btn-primary:hover { opacity: 0.92; color: #fff; }
+    .btn-primary:hover:not(:disabled) { opacity: 0.92; color: #fff; }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
 
     .publisher-card {
       max-width: 820px;
@@ -114,6 +120,7 @@
     }
 
     input:focus, textarea:focus { border-color: var(--crimson); }
+    input:disabled, textarea:disabled { opacity: 0.55; cursor: not-allowed; }
     textarea { min-height: 150px; resize: vertical; line-height: 1.5; }
 
     .status {
@@ -128,7 +135,7 @@
     <div class="brand">Samsus<span>Pulse</span> <small>// Publisher</small></div>
     <div class="nav-actions">
       <a href="/index.html" class="btn">← Back to Dashboard</a>
-      <button id="logoutBtn" class="btn">Logout</button>
+      <button type="button" id="logoutBtn" class="btn">Sign Out</button>
     </div>
   </header>
 
@@ -136,7 +143,7 @@
     <h1>Live Board Publisher</h1>
     <p class="subtitle">Compose and broadcast an official update to the SamsusPulse live dashboard.</p>
 
-    <div class="author-badge" id="authorInfo">Publishing as Member</div>
+    <div class="author-badge" id="authorInfo">Viewing as Guest</div>
 
     <form id="publishForm">
       <div class="form-group">
@@ -156,59 +163,152 @@
 
   <script>
     localStorage.removeItem("samsuspulse_user");
+    localStorage.removeItem("samsuspulse_token");
 
-    const session = JSON.parse(sessionStorage.getItem("samsuspulse_user") || "null");
-    if (!session) {
+    const titleInput = document.getElementById("postTitle");
+    const contentInput = document.getElementById("postContent");
+    const submitBtn = document.getElementById("submitBtn");
+    const statusEl = document.getElementById("statusMsg");
+    const authorInfoEl = document.getElementById("authorInfo");
+
+    function redirectToLogin() {
+      sessionStorage.removeItem("samsuspulse_user");
+      sessionStorage.removeItem("samsuspulse_token");
       window.location.replace("/login.html");
-    } else {
-      document.body.style.display = "";
-      document.getElementById("authorInfo").textContent =
-        `Publishing as ${session.name || session.username || "Member"} (${session.role || "Member"})`;
     }
 
-    document.getElementById("logoutBtn").addEventListener("click", () => {
-      sessionStorage.removeItem("samsuspulse_user");
-      window.location.replace("/login.html");
+    function applyPublisherIdentity(user) {
+      const role = String(user?.role || "Guest").trim();
+      const roleLower = role.toLowerCase();
+      const name = String(user?.name || (roleLower === "guest" ? "Guest" : "")).trim();
+
+      if (!name) {
+        redirectToLogin();
+        return;
+      }
+
+      if (roleLower === "guest") {
+        authorInfoEl.textContent = `Viewing as ${name} (Guest — Read Only)`;
+        titleInput.disabled = true;
+        contentInput.disabled = true;
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Guests Cannot Publish";
+        statusEl.style.color = "#f5c542";
+        statusEl.textContent = "Guest accounts can browse the board only. Sign in as a Member or Admin to publish.";
+      } else {
+        authorInfoEl.textContent = `Publishing as ${name} (${role})`;
+        titleInput.disabled = false;
+        contentInput.disabled = false;
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Publish to Live Board";
+        statusEl.textContent = "";
+      }
+
+      document.body.style.display = "";
+    }
+
+    async function initPublisherSession() {
+      const raw = sessionStorage.getItem("samsuspulse_user");
+      if (!raw) {
+        redirectToLogin();
+        return;
+      }
+
+      let localUser = null;
+      try {
+        localUser = JSON.parse(raw);
+      } catch {
+        redirectToLogin();
+        return;
+      }
+
+      if (!localUser || !localUser.name || !localUser.role) {
+        redirectToLogin();
+        return;
+      }
+
+      applyPublisherIdentity(localUser);
+
+      const token = sessionStorage.getItem("samsuspulse_token");
+      try {
+        const res = await fetch("/api/auth/me", {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.authenticated || !data.user) {
+          redirectToLogin();
+          return;
+        }
+        sessionStorage.setItem("samsuspulse_user", JSON.stringify(data.user));
+        applyPublisherIdentity(data.user);
+      } catch {
+        // Keep current session UI if offline/unreachable
+      }
+    }
+
+    document.getElementById("logoutBtn").addEventListener("click", async () => {
+      const token = sessionStorage.getItem("samsuspulse_token");
+      try {
+        await fetch("/api/auth/logout", {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+      } catch {}
+      redirectToLogin();
     });
 
     document.getElementById("publishForm").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const btn = document.getElementById("submitBtn");
-      const status = document.getElementById("statusMsg");
-      const title = document.getElementById("postTitle").value;
-      const content = document.getElementById("postContent").value;
+      const title = titleInput.value.trim();
+      const content = contentInput.value.trim();
+      const token = sessionStorage.getItem("samsuspulse_token");
 
-      btn.disabled = true;
-      btn.textContent = "Publishing...";
-      status.textContent = "";
+      const currentUser = JSON.parse(sessionStorage.getItem("samsuspulse_user") || "null");
+      if (String(currentUser?.role || "").toLowerCase() === "guest") {
+        applyPublisherIdentity(currentUser);
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Publishing...";
+      statusEl.textContent = "";
 
       try {
         const res = await fetch("/api/posts", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            author: session.name || session.username || "Member",
-            role: session.role || "Member",
-            title,
-            content
-          })
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({ title, content })
         });
 
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to publish.");
+        if (res.status === 401) {
+          redirectToLogin();
+          return;
+        }
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to publish.");
+        }
 
-        status.style.color = "#4ade80";
-        status.textContent = "Published! Redirecting to Dashboard...";
+        statusEl.style.color = "#4ade80";
+        statusEl.textContent = "Published! Redirecting to Dashboard...";
         setTimeout(() => {
           window.location.replace("/index.html");
         }, 700);
       } catch (err) {
-        status.style.color = "#f87171";
-        status.textContent = err.message;
-        btn.disabled = false;
-        btn.textContent = "Publish to Live Board";
+        statusEl.style.color = "#f87171";
+        statusEl.textContent = err.message;
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Publish to Live Board";
       }
     });
+
+    initPublisherSession();
   </script>
+</body>
+</html>
 </body>
 </html>
