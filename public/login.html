@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SamsusPulse // Access Portal</title>
+  <title>SamsusPulse // Device Alert Portal</title>
   <style>
     :root {
       --bg: #0a0a0c;
@@ -26,6 +26,72 @@
       align-items: center;
       justify-content: center;
       padding: 20px;
+    }
+
+    .device-toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      max-width: 340px;
+      width: calc(100% - 40px);
+      background: rgba(24, 24, 32, 0.96);
+      border: 1px solid rgba(245, 197, 66, 0.45);
+      border-left: 4px solid var(--gold);
+      border-radius: 14px;
+      padding: 14px 16px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.65);
+      z-index: 50;
+      animation: slideIn 0.25s ease-out;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .toast-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 6px;
+    }
+
+    .toast-close {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1;
+      padding: 0;
+      margin: 0;
+      width: auto;
+      cursor: pointer;
+    }
+
+    .toast-close:hover { color: #fff; box-shadow: none; transform: none; }
+
+    .toast-body {
+      font-size: 0.84rem;
+      color: #e5e7eb;
+      line-height: 1.45;
+    }
+
+    .toast-pin {
+      margin-top: 8px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: rgba(245, 197, 66, 0.12);
+      border: 1px dashed rgba(245, 197, 66, 0.5);
+      color: var(--gold);
+      font-size: 1.2rem;
+      font-weight: 800;
+      letter-spacing: 6px;
+      text-align: center;
     }
 
     .container {
@@ -103,30 +169,17 @@
       box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75);
     }
 
-    .tabs {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      background: rgba(0, 0, 0, 0.4);
-      padding: 4px;
-      border-radius: 12px;
-      margin-bottom: 24px;
+    .step-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: #fff;
     }
 
-    .tab {
-      padding: 10px;
-      text-align: center;
-      border-radius: 9px;
-      cursor: pointer;
-      font-weight: 600;
-      font-size: 0.9rem;
+    .step-sub {
+      font-size: 0.85rem;
       color: var(--muted);
-      transition: 0.25s;
-    }
-
-    .tab.active {
-      background: linear-gradient(135deg, var(--crimson), var(--wine));
-      color: white;
-      box-shadow: 0 4px 15px rgba(220, 20, 60, 0.35);
+      margin-bottom: 20px;
     }
 
     .form-group { margin-bottom: 16px; }
@@ -144,6 +197,13 @@
     }
 
     input:focus, select:focus { border-color: var(--crimson); }
+
+    .pin-input {
+      letter-spacing: 8px;
+      font-size: 1.25rem;
+      text-align: center;
+      font-weight: 700;
+    }
 
     button {
       width: 100%;
@@ -164,6 +224,20 @@
       box-shadow: 0 8px 20px rgba(220, 20, 60, 0.4);
     }
 
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border);
+      font-size: 0.88rem;
+      padding: 10px;
+      margin-top: 10px;
+    }
+
+    .btn-secondary:hover {
+      box-shadow: none;
+      border-color: var(--gold);
+      color: var(--gold);
+    }
+
     .status {
       margin-top: 14px;
       font-size: 0.85rem;
@@ -176,58 +250,89 @@
   </style>
 </head>
 <body>
+  <div id="device-toast" class="device-toast hidden" role="status" aria-live="polite">
+    <div class="toast-header">
+      <span>Device Alert // SamsusPulse</span>
+      <button type="button" class="toast-close" id="close-toast-btn" aria-label="Dismiss alert">&times;</button>
+    </div>
+    <div class="toast-body" id="toast-message">6-digit login code delivered to this device:</div>
+    <div class="toast-pin" id="toast-pin-value">000000</div>
+  </div>
+
   <div class="container">
     <div class="brand-panel">
       <span class="badge">Full-Stack Express Project // 1126</span>
       <h1>SamsusPulse</h1>
       <p class="description">
         A live community board and announcement dashboard powered by Node.js and Express.js.
-        Sign up once to access your account from any device or browser, publish live updates, and manage board posts.
+        Trigger a 6-digit device alert PIN directly on your screen—no email or password needed.
       </p>
       <div class="features">
-        <div><span class="dot"></span> Cross-device member login via Express.js &amp; persistent store</div>
+        <div><span class="dot"></span> Instant on-screen device alert 6-digit PIN verification</div>
         <div><span class="dot"></span> Shared live community feed with author, admin &amp; moderator delete controls</div>
         <div><span class="dot"></span> Tab-scoped session that requires login again when the tab closes</div>
       </div>
     </div>
 
     <div class="auth-card">
-      <div class="tabs">
-        <div class="tab active" id="tab-login" onclick="switchMode('login')">Log In</div>
-        <div class="tab" id="tab-signup" onclick="switchMode('signup')">Sign Up</div>
-      </div>
+      <!-- Step 1: Request Device PIN -->
+      <form id="request-pin-form">
+        <div class="step-title">Device Alert Login</div>
+        <p class="step-sub">Send a 6-digit one-time PIN directly to this device.</p>
 
-      <form id="auth-form">
-        <div id="signup-fields" class="hidden">
-          <div class="form-group">
-            <label for="name">Full Name / Handle</label>
-            <input type="text" id="name" placeholder="e.g., Alex Rivera" />
-          </div>
-          <div class="form-group">
-            <label for="role">Track / Role</label>
-            <select id="role">
-              <option value="ICT Student">ICT Student</option>
-              <option value="Web Developer">Web Developer</option>
-              <option value="UI/UX Designer">UI/UX Designer</option>
-              <option value="Moderator">Moderator</option>
-              <option value="Admin">Admin</option>
-              <option value="Guest Explorer">Guest Explorer</option>
-            </select>
-          </div>
+        <div class="form-group">
+          <label for="device">Device Name / Label</label>
+          <input
+            type="text"
+            id="device"
+            placeholder="This Device (e.g. Laptop or Phone)"
+            value="This Device"
+          />
         </div>
 
         <div class="form-group">
-          <label for="email">Email Address</label>
-          <input type="email" id="email" placeholder="you@example.com" required />
+          <label for="name">Display Name (used if new account)</label>
+          <input type="text" id="name" placeholder="Samantha Kate" />
         </div>
 
         <div class="form-group">
-          <label for="password">Password</label>
-          <input type="password" id="password" placeholder="••••••••" required />
+          <label for="role">Track / Role (used if new account)</label>
+          <select id="role">
+            <option value="ICT Student">ICT Student</option>
+            <option value="Web Developer">Web Developer</option>
+            <option value="UI/UX Designer">UI/UX Designer</option>
+            <option value="Moderator">Moderator</option>
+            <option value="Admin">Admin</option>
+            <option value="Guest Explorer">Guest Explorer</option>
+          </select>
         </div>
 
-        <button type="submit" id="submit-btn">Access Dashboard</button>
-        <div class="status" id="status-msg"></div>
+        <button type="submit" id="send-pin-btn">Send Device Alert PIN</button>
+        <div class="status" id="request-status"></div>
+      </form>
+
+      <!-- Step 2: Verify Device PIN -->
+      <form id="verify-pin-form" class="hidden">
+        <div class="step-title">Enter 6-Digit Device PIN</div>
+        <p class="step-sub" id="pin-target-label">Enter the PIN shown in your device alert.</p>
+
+        <div class="form-group">
+          <label for="pin">One-Time Device PIN</label>
+          <input
+            type="text"
+            id="pin"
+            class="pin-input"
+            inputmode="numeric"
+            maxlength="6"
+            pattern="[0-9]{6}"
+            placeholder="000000"
+            required
+          />
+        </div>
+
+        <button type="submit" id="verify-pin-btn">Verify &amp; Access Dashboard</button>
+        <button type="button" class="btn-secondary" id="back-btn">Change Device / Resend PIN</button>
+        <div class="status" id="verify-status"></div>
       </form>
     </div>
   </div>
@@ -239,52 +344,63 @@
       window.location.replace("/index.html");
     }
 
-    let mode = "login";
+    let activeDevice = "This Device";
 
-    function switchMode(newMode) {
-      mode = newMode;
-      document.getElementById("tab-login").classList.toggle("active", mode === "login");
-      document.getElementById("tab-signup").classList.toggle("active", mode === "signup");
-      document.getElementById("signup-fields").classList.toggle("hidden", mode === "login");
-      document.getElementById("submit-btn").textContent =
-        mode === "login" ? "Access Dashboard" : "Create Member Account";
-      document.getElementById("status-msg").textContent = "";
+    const requestForm = document.getElementById("request-pin-form");
+    const verifyForm = document.getElementById("verify-pin-form");
+    const toastEl = document.getElementById("device-toast");
+    const toastMsgEl = document.getElementById("toast-message");
+    const toastPinEl = document.getElementById("toast-pin-value");
+
+    function showDeviceAlert(device, pin, minutes = 5) {
+      toastMsgEl.textContent = `New login PIN for ${device} (valid for ${minutes} mins):`;
+      toastPinEl.textContent = pin;
+      toastEl.classList.remove("hidden");
     }
 
-    document.getElementById("auth-form").addEventListener("submit", async (e) => {
+    document.getElementById("close-toast-btn").addEventListener("click", () => {
+      toastEl.classList.add("hidden");
+    });
+
+    requestForm.addEventListener("submit", async (e) => {
       e.preventDefault();
-      const statusEl = document.getElementById("status-msg");
-      const btn = document.getElementById("submit-btn");
+      const statusEl = document.getElementById("request-status");
+      const btn = document.getElementById("send-pin-btn");
+      const device = document.getElementById("device").value.trim() || "This Device";
+      const name = document.getElementById("name").value.trim();
+      const role = document.getElementById("role").value;
+
       statusEl.className = "status";
-      statusEl.textContent = "Connecting to server...";
+      statusEl.textContent = "Sending device alert...";
       btn.disabled = true;
 
-      const endpoint = mode === "signup" ? "/api/signup" : "/api/login";
-      const payload = {
-        email: document.getElementById("email").value,
-        password: document.getElementById("password").value,
-        name: document.getElementById("name").value,
-        role: document.getElementById("role").value
-      };
-
       try {
-        const res = await fetch(endpoint, {
+        const res = await fetch("/api/auth/request-pin", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
+          body: JSON.stringify({ device, name, role })
         });
         const data = await res.json();
 
         if (!res.ok) {
           statusEl.className = "status error";
-          statusEl.textContent = data.error || "Authentication failed.";
+          statusEl.textContent = data.error || "Could not send device alert.";
         } else {
-          statusEl.className = "status success";
-          statusEl.textContent = (data.message || "Success!") + " Redirecting...";
-          sessionStorage.setItem("samsuspulse_user", JSON.stringify(data.user));
-          setTimeout(() => {
-            window.location.replace("/index.html");
-          }, 500);
+          activeDevice = device;
+          document.getElementById("pin-target-label").textContent =
+            `Enter the 6-digit PIN from the device alert for ${device} (valid for 5 minutes).`;
+          if (data.deviceAlert?.pin) {
+            showDeviceAlert(
+              data.deviceAlert.device || device,
+              data.deviceAlert.pin,
+              data.deviceAlert.expiresInMinutes || 5
+            );
+          }
+          requestForm.classList.add("hidden");
+          verifyForm.classList.remove("hidden");
+          document.getElementById("pin").focus();
+          document.getElementById("verify-status").className = "status success";
+          document.getElementById("verify-status").textContent = data.message || "Device alert sent!";
         }
       } catch {
         statusEl.className = "status error";
@@ -292,6 +408,52 @@
       } finally {
         btn.disabled = false;
       }
+    });
+
+    verifyForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const statusEl = document.getElementById("verify-status");
+      const btn = document.getElementById("verify-pin-btn");
+      const pin = document.getElementById("pin").value.trim();
+
+      statusEl.className = "status";
+      statusEl.textContent = "Verifying device PIN...";
+      btn.disabled = true;
+
+      try {
+        const res = await fetch("/api/auth/verify-pin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ device: activeDevice, pin })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          statusEl.className = "status error";
+          statusEl.textContent = data.error || "PIN verification failed.";
+        } else {
+          statusEl.className = "status success";
+          statusEl.textContent = (data.message || "Verified!") + " Redirecting...";
+          toastEl.classList.add("hidden");
+          sessionStorage.setItem("samsuspulse_user", JSON.stringify(data.user));
+          setTimeout(() => {
+            window.location.replace("/index.html");
+          }, 500);
+        }
+      } catch {
+        statusEl.className = "status error";
+        statusEl.textContent = "Network error while verifying PIN.";
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    document.getElementById("back-btn").addEventListener("click", () => {
+      verifyForm.classList.add("hidden");
+      requestForm.classList.remove("hidden");
+      document.getElementById("pin").value = "";
+      document.getElementById("verify-status").textContent = "";
+      document.getElementById("request-status").textContent = "";
     });
   </script>
 </body>
