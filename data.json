@@ -5,7 +5,7 @@
       "name": "Samantha Kate",
       "username": "Samantha Kate",
       "email": "katecosing08@gmail.com",
-      "password": "samantha",
+      "passwordHash": "7a0786cf4317315382e4348cf0d157d1bb49a3748a897bf3f91b86d78e67782e",
       "role": "Admin"
     },
     {
@@ -13,7 +13,7 @@
       "name": "arnieLcalisin",
       "username": "arnieLcalisin",
       "email": "arniecalisin@gmail.com",
-      "password": "080811",
+      "passwordHash": "4df2a4752b7496f13c7d633868393898c5360a8a3e1337e9386b8681dd763f57",
       "role": "Moderator"
     },
     {
@@ -21,7 +21,7 @@
       "name": "New Member",
       "username": "newmember",
       "email": "member@example.com",
-      "password": "passwordHash",
+      "passwordHash": "ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f",
       "role": "Member"
     }
   ],
