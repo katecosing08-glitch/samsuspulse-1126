@@ -1,6 +1,42 @@
 {
-  "users": [],
+  "users": [
+    {
+      "id": 1795778042360,
+      "name": "Samantha Kate",
+      "username": "Samantha Kate",
+      "device": "This Device",
+      "role": "Admin",
+      "authMethod": "device-alert",
+      "createdAt": "11/27/2026, 7:14:02 PM"
+    },
+    {
+      "id": "8fc60adf-c15e-45ae-9427-b9712d9008e1",
+      "name": "Guest",
+      "role": "Guest",
+      "device": "This Device",
+      "createdAt": "2026-11-27T11:42:39.842Z",
+      "lastLoginAt": "2026-11-27T12:07:14.677Z"
+    },
+    {
+      "id": "ca7ccbff-4897-4483-b1fd-7e20662d33bc",
+      "name": "Bam",
+      "role": "Member",
+      "device": "This Device",
+      "createdAt": "2026-11-27T12:05:45.543Z",
+      "lastLoginAt": "2026-11-27T12:05:45.543Z"
+    }
+  ],
   "posts": [
+    {
+      "id": 3,
+      "author": "Bam",
+      "role": "Member",
+      "title": "Cafe",
+      "content": "Try BLK. 36 CAFEEEE",
+      "timestamp": "11/27/2026, 8:06:25 PM"
+    },
+    {
+    },
     {
       "id": 1,
       "author": "Admin",
