@@ -10,6 +10,9 @@ const DATA_FILE = join(__dirname, "data.json");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const PIN_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+const pendingPins = new Map();
 
 app.use(express.json());
 app.use(express.static(join(__dirname, "public")));
@@ -28,8 +31,17 @@ const defaultData = {
   ]
 };
 
-function hashPassword(password) {
-  return crypto.createHash("sha256").update(String(password)).digest("hex");
+function hashValue(value) {
+  return crypto.createHash("sha256").update(String(value)).digest("hex");
+}
+
+function generateSixDigitPin() {
+  return String(crypto.randomInt(100000, 1000000));
+}
+
+function normalizeDeviceKey(rawDevice) {
+  const trimmed = String(rawDevice || "").trim();
+  return (trimmed || "this-device").toLowerCase();
 }
 
 async function loadData() {
@@ -63,83 +75,113 @@ function canDeletePost(post, requester = {}) {
   return Boolean(reqName && postAuthor && reqName === postAuthor);
 }
 
-// POST /api/signup - Create a persistent member account
-app.post("/api/signup", async (req, res) => {
+// POST /api/auth/request-pin - Generate a 6-digit PIN and deliver via on-screen Device Alert
+app.post("/api/auth/request-pin", async (req, res) => {
   try {
-    const { name, email, password, role } = req.body || {};
+    const { device, contact, email, name, role } = req.body || {};
+    const rawTarget = String(device || contact || email || "This Device").trim() || "This Device";
+    const deviceKey = normalizeDeviceKey(rawTarget);
     const cleanName = String(name || "").trim();
-    const cleanEmail = String(email || "").trim().toLowerCase();
-    const rawPassword = String(password || "");
-    const allowedRoles = ["ICT Student", "Web Developer", "UI/UX Designer", "Moderator", "Admin", "Guest Explorer", "Member"];
-    const cleanRole = allowedRoles.includes(role) ? role : "ICT Student";
-
-    if (!cleanName || !cleanEmail || !rawPassword) {
-      return res.status(400).json({ error: "Name, email, and password are required." });
-    }
+    const allowedRoles = [
+      "ICT Student",
+      "Web Developer",
+      "UI/UX Designer",
+      "Moderator",
+      "Admin",
+      "Guest Explorer",
+      "Member"
+    ];
+    const requestedRole = allowedRoles.includes(role) ? role : "ICT Student";
 
     const store = await loadData();
-    const exists = store.users.some((u) => u.email.toLowerCase() === cleanEmail);
-    if (exists) {
-      return res.status(409).json({ error: "An account with this email already exists." });
-    }
+    const existingUser = store.users.find(
+      (u) => normalizeDeviceKey(u.device || u.contact || u.email) === deviceKey
+    );
 
-    const newUser = {
-      id: Date.now(),
-      name: cleanName,
-      email: cleanEmail,
-      role: cleanRole,
-      passwordHash: hashPassword(rawPassword),
-      createdAt: new Date().toLocaleString()
-    };
+    const pin = generateSixDigitPin();
+    const expiresAt = Date.now() + PIN_TTL_MS;
 
-    store.users.push(newUser);
-    await saveData(store);
+    pendingPins.set(deviceKey, {
+      pinHash: hashValue(pin),
+      expiresAt,
+      name: existingUser?.name || existingUser?.username || cleanName || rawTarget,
+      role: existingUser?.role || requestedRole
+    });
 
-    return res.status(201).json({
-      message: "Account created!",
-      user: {
-        id: newUser.id,
-        name: newUser.name,
-        email: newUser.email,
-        role: newUser.role
+    console.log(`[SamsusPulse Device Alert] Device: ${rawTarget} | PIN: ${pin} (expires in 5 mins)`);
+
+    return res.json({
+      message: `Device alert sent to ${rawTarget}.`,
+      expiresInSeconds: PIN_TTL_MS / 1000,
+      deviceAlert: {
+        device: rawTarget,
+        pin,
+        expiresInMinutes: 5
       }
     });
   } catch {
-    return res.status(500).json({ error: "Failed to create account." });
+    return res.status(500).json({ error: "Failed to trigger device alert." });
   }
 });
 
-// POST /api/login - Authenticate existing member from any device/browser
-app.post("/api/login", async (req, res) => {
+// POST /api/auth/verify-pin - Verify the 6-digit PIN and create/return user session
+app.post("/api/auth/verify-pin", async (req, res) => {
   try {
-    const { email, password } = req.body || {};
-    const cleanEmail = String(email || "").trim().toLowerCase();
-    const rawPassword = String(password || "");
+    const { device, contact, email, pin } = req.body || {};
+    const rawTarget = String(device || contact || email || "This Device").trim() || "This Device";
+    const deviceKey = normalizeDeviceKey(rawTarget);
+    const cleanPin = String(pin || "").trim();
 
-    if (!cleanEmail || !rawPassword) {
-      return res.status(400).json({ error: "Email and password are required." });
+    if (!cleanPin) {
+      return res.status(400).json({ error: "6-digit PIN is required." });
     }
 
+    const challenge = pendingPins.get(deviceKey);
+    if (!challenge) {
+      return res.status(401).json({ error: "No active PIN found. Please send a new device alert." });
+    }
+
+    if (Date.now() > challenge.expiresAt) {
+      pendingPins.delete(deviceKey);
+      return res.status(401).json({ error: "This PIN has expired. Please send a new one." });
+    }
+
+    if (challenge.pinHash !== hashValue(cleanPin)) {
+      return res.status(401).json({ error: "Invalid device PIN." });
+    }
+
+    pendingPins.delete(deviceKey);
+
     const store = await loadData();
-    const user = store.users.find(
-      (u) => u.email.toLowerCase() === cleanEmail && u.passwordHash === hashPassword(rawPassword)
+    let user = store.users.find(
+      (u) => normalizeDeviceKey(u.device || u.contact || u.email) === deviceKey
     );
 
     if (!user) {
-      return res.status(401).json({ error: "Invalid email or password." });
+      user = {
+        id: Date.now(),
+        name: challenge.name,
+        username: challenge.name,
+        device: rawTarget,
+        role: challenge.role,
+        authMethod: "device-alert",
+        createdAt: new Date().toLocaleString()
+      };
+      store.users.push(user);
+      await saveData(store);
     }
 
     return res.json({
-      message: "Login successful!",
+      message: "Device PIN verified!",
       user: {
         id: user.id,
-        name: user.name,
-        email: user.email,
+        name: user.name || user.username,
+        device: user.device || rawTarget,
         role: user.role
       }
     });
   } catch {
-    return res.status(500).json({ error: "Login failed." });
+    return res.status(500).json({ error: "PIN verification failed." });
   }
 });
 
