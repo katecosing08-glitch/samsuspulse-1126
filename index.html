@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SamsusPulse // Dashboard</title>
+  <style>
+    :root {
+      --bg: #0a0a0c;
+      --card: rgba(22, 22, 28, 0.88);
+      --crimson: #dc143c;
+      --wine: #800020;
+      --gold: #f5c542;
+      --text: #f4f4f6;
+      --muted: #9ca3af;
+      --border: rgba(255, 255, 255, 0.1);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+
+    body {
+      min-height: 100vh;
+      background: radial-gradient(circle at top right, #2b0711, var(--bg) 55%);
+      color: var(--text);
+      padding: 24px;
+    }
+
+    .container { max-width: 960px; margin: 0 auto; }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 16px 22px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      margin-bottom: 24px;
+    }
+
+    .brand { font-size: 1.3rem; font-weight: 800; }
+    .brand span { color: var(--crimson); }
+    .brand small { color: var(--gold); font-size: 0.78rem; margin-left: 8px; text-transform: uppercase; }
+
+    .nav-actions { display: flex; gap: 10px; align-items: center; }
+
+    .btn {
+      padding: 10px 16px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      text-decoration: none;
+      transition: 0.2s;
+    }
+
+    .btn:hover { border-color: var(--gold); color: var(--gold); }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--crimson), var(--wine));
+      border: none;
+      color: #fff;
+      box-shadow: 0 6px 20px rgba(220, 20, 60, 0.35);
+    }
+
+    .btn-primary:hover { opacity: 0.92; color: #fff; }
+
+    .btn-delete {
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(248, 113, 113, 0.35);
+      background: rgba(220, 20, 60, 0.14);
+      color: #fca5a5;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .btn-delete:hover {
+      background: rgba(220, 20, 60, 0.3);
+      color: #fff;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+    }
+
+    .stat-label { color: var(--muted); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-value { font-size: 1.4rem; font-weight: 700; margin-top: 6px; color: var(--gold); }
+
+    .about-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--gold);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+
+    .about-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .about-title { font-size: 1.05rem; color: var(--gold); }
+    .about-tag { font-size: 0.78rem; color: var(--muted); }
+    .about-body { color: #d1d5db; font-size: 0.94rem; line-height: 1.6; }
+
+    .feed-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .post-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--crimson);
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 14px;
+    }
+
+    .post-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .post-meta-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .role-pill {
+      background: rgba(220, 20, 60, 0.18);
+      color: #ff6b88;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 600;
+      margin-left: 6px;
+    }
+
+    .post-title { font-size: 1.12rem; font-weight: 700; margin-bottom: 6px; color: #fff; }
+    .post-body { color: #d1d5db; line-height: 1.55; white-space: pre-wrap; }
+    .empty { text-align: center; color: var(--muted); padding: 40px 20px; background: var(--card); border-radius: 16px; }
+  </style>
+</head>
+<body style="display: none;">
+  <div class="container">
+    <header class="topbar">
+      <div class="brand">Samsus<span>Pulse</span> <small>// Dashboard</small></div>
+      <div class="nav-actions">
+        <a href="/publisher.html" class="btn btn-primary">+ Live Board Publisher</a>
+        <button id="refreshBtn" class="btn">Refresh</button>
+        <button id="logoutBtn" class="btn">Logout</button>
+      </div>
+    </header>
+
+    <section class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Active Member</div>
+        <div class="stat-value" id="userName">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Access Role</div>
+        <div class="stat-value" id="userRole">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Live Board Posts</div>
+        <div class="stat-value" id="postCount">0</div>
+      </div>
+    </section>
+
+    <section class="about-card" id="aboutSection">
+      <div class="about-header">
+        <h2 class="about-title">About SamsusPulse</h2>
+        <span class="about-tag">Express.js Live Board</span>
+      </div>
+      <p class="about-body">
+        SamsusPulse is a live community board and announcement dashboard powered by a Node.js and Express.js backend.
+        Members can sign in, view real-time board updates, and publish new announcements through the Live Board Publisher.
+      </p>
+    </section>
+
+    <div class="feed-header">
+      <h2>Live Community Feed</h2>
+    </div>
+
+    <div id="feedList">
+      <div class="empty">Loading live board updates...</div>
+    </div>
+  </div>
+
+  <script>
+    localStorage.removeItem("samsuspulse_user");
+
+    const session = JSON.parse(sessionStorage.getItem("samsuspulse_user") || "null");
+    if (!session) {
+      window.location.replace("/login.html");
+    } else {
+      document.body.style.display = "";
+      document.getElementById("userName").textContent = session.name || session.username || "Member";
+      document.getElementById("userRole").textContent = session.role || "Member";
+    }
+
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+      sessionStorage.removeItem("samsuspulse_user");
+      window.location.replace("/login.html");
+    });
+
+    function canCurrentUserDelete(post) {
+      const role = String(session?.role || "").toLowerCase();
+      if (role === "admin" || role === "moderator") {
+        return true;
+      }
+      const currentName = String(session?.name || session?.username || "").trim().toLowerCase();
+      const authorName = String(post?.author || "").trim().toLowerCase();
+      return Boolean(currentName && authorName && currentName === authorName);
+    }
+
+    async function deletePost(postId) {
+      try {
+        const res = await fetch(`/api/posts/${encodeURIComponent(postId)}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: session?.name || session?.username || "",
+            role: session?.role || ""
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.error || "Could not delete post.");
+          return;
+        }
+        await loadPosts();
+      } catch {
+        alert("Network error while deleting post.");
+      }
+    }
+
+    async function loadPosts() {
+      const feedList = document.getElementById("feedList");
+      try {
+        const res = await fetch("/api/posts");
+        const data = await res.json();
+        const posts = data.posts || [];
+        document.getElementById("postCount").textContent = posts.length;
+
+        if (!posts.length) {
+          feedList.innerHTML = `<div class="empty">No posts yet. Click <strong>+ Live Board Publisher</strong> to create the first update!</div>`;
+          return;
+        }
+
+        feedList.innerHTML = posts.map(p => {
+          const deletable = canCurrentUserDelete(p);
+          return `
+            <article class="post-card">
+              <div class="post-meta">
+                <span><strong>${escapeHtml(p.author || "Member")}</strong> <span class="role-pill">${escapeHtml(p.role || "Member")}</span></span>
+                <div class="post-meta-right">
+                  <span>${escapeHtml(p.timestamp || "")}</span>
+                  ${deletable ? `<button class="btn-delete" onclick="deletePost(${Number(p.id)})">Delete</button>` : ""}
+                </div>
+              </div>
+              <div class="post-title">${escapeHtml(p.title)}</div>
+              <div class="post-body">${escapeHtml(p.content)}</div>
+            </article>
+          `;
+        }).join("");
+      } catch {
+        feedList.innerHTML = `<div class="empty">Could not load live board posts right now.</div>`;
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, m => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[m]));
+    }
+
+    document.getElementById("refreshBtn").addEventListener("click", loadPosts);
+    loadPosts();
+  </script>
+</body>
+</html>

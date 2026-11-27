@@ -1,0 +1,47 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "name": "Samantha Kate",
+      "username": "Samantha Kate",
+      "email": "katecosing08@gmail.com",
+      "password": "samantha",
+      "role": "Admin"
+    },
+    {
+      "id": 2,
+      "name": "arnieLcalisin",
+      "username": "arnieLcalisin",
+      "email": "arniecalisin@gmail.com",
+      "password": "080811",
+      "role": "Moderator"
+    },
+    {
+      "id": 4,
+      "name": "New Member",
+      "username": "newmember",
+      "email": "member@example.com",
+      "password": "password",
+      "role": "Member"
+    }
+  ],
+  "posts": [
+    {
+      "id": 2,
+      "author": "Samantha Kate",
+      "authorEmail": "katecosing08@gmail.com",
+      "role": "Moderator",
+      "title": "from Ms. Samantha",
+      "content": "Hello World!",
+      "timestamp": "11/27/2026, 2:50:29 PM"
+    },
+    {
+      "id": 1,
+      "author": "Samantha Kate Lumbre",
+      "role": "Admin",
+      "title": "Welcome to SamsusPulse",
+      "content": "Express.js backend is active and serving live board updates.",
+      "timestamp": "11/2/2026, 12:00:00 PM"
+    }
+  ]
+}
