@@ -1,47 +1,13 @@
 {
-  "users": [
-    {
-      "id": 1,
-      "name": "Samantha Kate",
-      "username": "Samantha Kate",
-      "email": "katecosing08@gmail.com",
-      "passwordHash": "7a0786cf4317315382e4348cf0d157d1bb49a3748a897bf3f91b86d78e67782e",
-      "role": "Admin"
-    },
-    {
-      "id": 2,
-      "name": "arnieLcalisin",
-      "username": "arnieLcalisin",
-      "email": "arniecalisin@gmail.com",
-      "passwordHash": "4df2a4752b7496f13c7d633868393898c5360a8a3e1337e9386b8681dd763f57",
-      "role": "Moderator"
-    },
-    {
-      "id": 4,
-      "name": "New Member",
-      "username": "newmember",
-      "email": "member@example.com",
-      "passwordHash": "ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f",
-      "role": "Member"
-    }
-  ],
+  "users": [],
   "posts": [
     {
-      "id": 2,
-      "author": "Samantha Kate",
-      "authorEmail": "katecosing08@gmail.com",
-      "role": "Moderator",
-      "title": "from Ms. Samantha",
-      "content": "Hello World!",
-      "timestamp": "11/27/2026, 2:50:29 PM"
-    },
-    {
       "id": 1,
-      "author": "Samantha Kate Lumbre",
+      "author": "Admin",
       "role": "Admin",
       "title": "Welcome to SamsusPulse",
       "content": "Express.js backend is active and serving live board updates.",
-      "timestamp": "11/2/2026, 12:00:00 PM"
+      "timestamp": "11/27/2026, 6:30:00 PM"
     }
   ]
 }
