@@ -126,8 +126,9 @@
   </div>
 
   <script>
-    const session = JSON.parse(localStorage.getItem("samsuspulse_user") || "null");
-    if (!session || (!session.email && !session.username)) {
+  const session = JSON.parse(sessionStorage.getItem("samsuspulse_user") || "null");
+  // inside logoutBtn click handler:
+  sessionStorage.removeItem("samsuspulse_user"); {
       window.location.href = "/login.html";
     }
 
