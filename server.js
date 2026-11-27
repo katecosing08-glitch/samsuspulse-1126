@@ -1,8 +1,8 @@
 import express from "express";
 import crypto from "node:crypto";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
-import { readFile, writeFile } from "fs/promises";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { readFile, writeFile } from "node:fs/promises";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -11,8 +11,12 @@ const DATA_FILE = join(__dirname, "data.json");
 const app = express();
 const PORT = process.env.PORT || 3000;
 const PIN_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+const ALLOWED_ROLES = new Set(["Admin", "Member", "Guest"]);
 
 const pendingPins = new Map();
+const sessions = new Map();
 
 app.use(express.json());
 app.use(express.static(join(__dirname, "public")));
@@ -22,7 +26,7 @@ const defaultData = {
   posts: [
     {
       id: 1,
-      author: "Admin",
+      author: "SamsusPulse System",
       role: "Admin",
       title: "Welcome to SamsusPulse",
       content: "Express.js backend is active and serving live board updates.",
@@ -31,26 +35,36 @@ const defaultData = {
   ]
 };
 
+function normalizeRole(rawRole) {
+  const cleaned = String(rawRole || "").trim();
+  if (!cleaned) return "Member";
+  const matched = Array.from(ALLOWED_ROLES).find(
+    (r) => r.toLowerCase() === cleaned.toLowerCase()
+  );
+  return matched || "Member";
+}
+
+function normalizeName(rawName, role) {
+  const cleaned = String(rawName || "").trim();
+  if (cleaned) return cleaned.slice(0, 60);
+  return role === "Guest" ? "Guest" : "Member";
+}
+
 function hashValue(value) {
   return crypto.createHash("sha256").update(String(value)).digest("hex");
 }
 
 function generateSixDigitPin() {
-  return String(crypto.randomInt(100000, 1000000));
-}
-
-function normalizeDeviceKey(rawDevice) {
-  const trimmed = String(rawDevice || "").trim();
-  return (trimmed || "this-device").toLowerCase();
+  return String(crypto.randomInt(0, 1000000)).padStart(6, "0");
 }
 
 async function loadData() {
   try {
-    const raw = await readFile(DATA_FILE, "utf-8");
+    const raw = await readFile(DATA_FILE, "utf8");
     const parsed = JSON.parse(raw);
     return {
       users: Array.isArray(parsed.users) ? parsed.users : [],
-      posts: Array.isArray(parsed.posts) ? parsed.posts : []
+      posts: Array.isArray(parsed.posts) ? parsed.posts : [...defaultData.posts]
     };
   } catch {
     await saveData(defaultData);
@@ -62,200 +76,260 @@ async function loadData() {
 }
 
 async function saveData(data) {
-  await writeFile(DATA_FILE, JSON.stringify(data, null, 2), "utf-8");
+  await writeFile(DATA_FILE, JSON.stringify(data, null, 2), "utf8");
 }
 
-function canDeletePost(post, requester = {}) {
-  const role = String(requester.role || "").toLowerCase();
-  if (role === "admin" || role === "moderator") {
-    return true;
+function extractToken(req) {
+  const authHeader = req.get("authorization") || "";
+  if (authHeader.startsWith("Bearer ")) {
+    return authHeader.slice(7).trim();
   }
-  const reqName = String(requester.name || requester.username || "").trim().toLowerCase();
-  const postAuthor = String(post.author || "").trim().toLowerCase();
-  return Boolean(reqName && postAuthor && reqName === postAuthor);
+  const cookieHeader = req.get("cookie") || "";
+  const match = cookieHeader
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith("samsuspulse_token="));
+  return match ? decodeURIComponent(match.slice("samsuspulse_token=".length)) : "";
 }
 
-// POST /api/auth/request-pin - Generate a 6-digit PIN and deliver via on-screen Device Alert
+function getAuthenticatedUser(req) {
+  const token = extractToken(req);
+  if (!token) return null;
+  const session = sessions.get(token);
+  if (!session) return null;
+  if (Date.now() > session.expiresAt) {
+    sessions.delete(token);
+    return null;
+  }
+  return {
+    token,
+    user: {
+      id: session.user.id,
+      name: session.user.name,
+      role: session.user.role,
+      device: session.user.device
+    }
+  };
+}
+
+// Return current visitor identity (Guest if not signed in)
+app.get("/api/auth/me", (req, res) => {
+  const auth = getAuthenticatedUser(req);
+  if (!auth) {
+    return res.json({
+      authenticated: false,
+      user: { name: "Guest", role: "Guest" }
+    });
+  }
+  return res.json({
+    authenticated: true,
+    user: auth.user
+  });
+});
+
+// Step 1: Request a 6-digit PIN tied to a specific requestId, name, role, and device
 app.post("/api/auth/request-pin", async (req, res) => {
-  try {
-    const { device, contact, email, name, role } = req.body || {};
-    const rawTarget = String(device || contact || email || "This Device").trim() || "This Device";
-    const deviceKey = normalizeDeviceKey(rawTarget);
-    const cleanName = String(name || "").trim();
-    const allowedRoles = [
-      "ICT Student",
-      "Web Developer",
-      "UI/UX Designer",
-      "Moderator",
-      "Admin",
-      "Guest Explorer",
-      "Member"
-    ];
-    const requestedRole = allowedRoles.includes(role) ? role : "ICT Student";
+  const device = String(req.body?.device || "This Device").trim().slice(0, 80) || "This Device";
+  const role = normalizeRole(req.body?.role);
+  const name = normalizeName(req.body?.name, role);
 
-    const store = await loadData();
-    const existingUser = store.users.find(
-      (u) => normalizeDeviceKey(u.device || u.contact || u.email) === deviceKey
-    );
-
-    const pin = generateSixDigitPin();
-    const expiresAt = Date.now() + PIN_TTL_MS;
-
-    pendingPins.set(deviceKey, {
-      pinHash: hashValue(pin),
-      expiresAt,
-      name: existingUser?.name || existingUser?.username || cleanName || rawTarget,
-      role: existingUser?.role || requestedRole
-    });
-
-    console.log(`[SamsusPulse Device Alert] Device: ${rawTarget} | PIN: ${pin} (expires in 5 mins)`);
-
-    return res.json({
-      message: `Device alert sent to ${rawTarget}.`,
-      expiresInSeconds: PIN_TTL_MS / 1000,
-      deviceAlert: {
-        device: rawTarget,
-        pin,
-        expiresInMinutes: 5
-      }
-    });
-  } catch {
-    return res.status(500).json({ error: "Failed to trigger device alert." });
+  if (role !== "Guest" && !String(req.body?.name || "").trim()) {
+    return res.status(400).json({ error: "Please enter your display name." });
   }
+
+  const pin = generateSixDigitPin();
+  const requestId = crypto.randomUUID();
+  const expiresAt = Date.now() + PIN_TTL_MS;
+
+  pendingPins.set(requestId, {
+    requestId,
+    device,
+    name,
+    role,
+    pinHash: hashValue(pin),
+    expiresAt,
+    attempts: 0
+  });
+
+  return res.json({
+    requestId,
+    message: `6-digit PIN generated for ${name} (${role}).`,
+    deviceAlert: {
+      requestId,
+      device,
+      name,
+      role,
+      pin,
+      expiresInMinutes: 5
+    }
+  });
 });
 
-// POST /api/auth/verify-pin - Verify the 6-digit PIN and create/return user session
+// Step 2: Verify PIN and create an isolated user session
 app.post("/api/auth/verify-pin", async (req, res) => {
-  try {
-    const { device, contact, email, pin } = req.body || {};
-    const rawTarget = String(device || contact || email || "This Device").trim() || "This Device";
-    const deviceKey = normalizeDeviceKey(rawTarget);
-    const cleanPin = String(pin || "").trim();
+  const requestId = String(req.body?.requestId || "").trim();
+  const pin = String(req.body?.pin || "").trim();
 
-    if (!cleanPin) {
-      return res.status(400).json({ error: "6-digit PIN is required." });
-    }
-
-    const challenge = pendingPins.get(deviceKey);
-    if (!challenge) {
-      return res.status(401).json({ error: "No active PIN found. Please send a new device alert." });
-    }
-
-    if (Date.now() > challenge.expiresAt) {
-      pendingPins.delete(deviceKey);
-      return res.status(401).json({ error: "This PIN has expired. Please send a new one." });
-    }
-
-    if (challenge.pinHash !== hashValue(cleanPin)) {
-      return res.status(401).json({ error: "Invalid device PIN." });
-    }
-
-    pendingPins.delete(deviceKey);
-
-    const store = await loadData();
-    let user = store.users.find(
-      (u) => normalizeDeviceKey(u.device || u.contact || u.email) === deviceKey
-    );
-
-    if (!user) {
-      user = {
-        id: Date.now(),
-        name: challenge.name,
-        username: challenge.name,
-        device: rawTarget,
-        role: challenge.role,
-        authMethod: "device-alert",
-        createdAt: new Date().toLocaleString()
-      };
-      store.users.push(user);
-      await saveData(store);
-    }
-
-    return res.json({
-      message: "Device PIN verified!",
-      user: {
-        id: user.id,
-        name: user.name || user.username,
-        device: user.device || rawTarget,
-        role: user.role
-      }
-    });
-  } catch {
-    return res.status(500).json({ error: "PIN verification failed." });
+  if (!/^\d{6}$/.test(pin)) {
+    return res.status(400).json({ error: "Please enter a valid 6-digit PIN." });
   }
-});
 
-// GET /api/posts - Retrieve all live board posts
-app.get("/api/posts", async (req, res) => {
-  try {
-    const store = await loadData();
-    return res.json({ posts: store.posts });
-  } catch {
-    return res.status(500).json({ error: "Failed to load posts." });
+  const entry = requestId ? pendingPins.get(requestId) : null;
+  if (!entry) {
+    return res.status(400).json({ error: "PIN request not found or expired. Please request a new PIN." });
   }
-});
 
-// POST /api/posts - Publish a new post to the live board
-app.post("/api/posts", async (req, res) => {
-  try {
-    const { author, role, title, content } = req.body || {};
-    const cleanTitle = String(title || "").trim();
-    const cleanContent = String(content || "").trim();
+  if (Date.now() > entry.expiresAt) {
+    pendingPins.delete(requestId);
+    return res.status(400).json({ error: "PIN has expired. Please request a new PIN." });
+  }
 
-    if (!cleanTitle || !cleanContent) {
-      return res.status(400).json({ error: "Title and content are required." });
-    }
+  if (entry.attempts >= 5) {
+    pendingPins.delete(requestId);
+    return res.status(429).json({ error: "Too many invalid attempts. Please request a new PIN." });
+  }
 
-    const store = await loadData();
-    const nextId = store.posts.reduce((max, p) => Math.max(max, Number(p.id) || 0), 0) + 1;
+  if (hashValue(pin) !== entry.pinHash) {
+    entry.attempts += 1;
+    return res.status(401).json({ error: "Incorrect PIN. Try again." });
+  }
 
-    const newPost = {
-      id: nextId,
-      author: String(author || "Member").trim() || "Member",
-      role: String(role || "Member").trim() || "Member",
-      title: cleanTitle,
-      content: cleanContent,
-      timestamp: new Date().toLocaleString()
+  pendingPins.delete(requestId);
+
+  const data = await loadData();
+  const existingIndex = data.users.findIndex(
+    (u) =>
+      String(u.name || "").trim().toLowerCase() === entry.name.toLowerCase() &&
+      String(u.role || "").trim().toLowerCase() === entry.role.toLowerCase()
+  );
+
+  let savedUser;
+  if (existingIndex >= 0) {
+    savedUser = {
+      ...data.users[existingIndex],
+      name: entry.name,
+      role: entry.role,
+      device: entry.device,
+      lastLoginAt: new Date().toISOString()
     };
-
-    store.posts.unshift(newPost);
-    await saveData(store);
-
-    return res.status(201).json({ message: "Post published!", post: newPost });
-  } catch {
-    return res.status(500).json({ error: "Failed to publish post." });
+    data.users[existingIndex] = savedUser;
+  } else {
+    savedUser = {
+      id: crypto.randomUUID(),
+      name: entry.name,
+      role: entry.role,
+      device: entry.device,
+      createdAt: new Date().toISOString(),
+      lastLoginAt: new Date().toISOString()
+    };
+    data.users.push(savedUser);
   }
+
+  await saveData(data);
+
+  const token = crypto.randomBytes(32).toString("hex");
+  const sessionUser = {
+    id: savedUser.id,
+    name: savedUser.name,
+    role: savedUser.role,
+    device: savedUser.device
+  };
+
+  sessions.set(token, {
+    user: sessionUser,
+    expiresAt: Date.now() + SESSION_TTL_MS
+  });
+
+  res.cookie("samsuspulse_token", token, {
+    httpOnly: true,
+    sameSite: "lax",
+    maxAge: SESSION_TTL_MS
+  });
+
+  return res.json({
+    message: `Signed in as ${sessionUser.name} (${sessionUser.role}).`,
+    token,
+    user: sessionUser
+  });
 });
 
-// DELETE /api/posts/:id - Delete a post if requester is author, Admin, or Moderator
-app.delete("/api/posts/:id", async (req, res) => {
-  try {
-    const postId = Number(req.params.id);
-    const requester = req.body || {};
+app.post("/api/auth/logout", (req, res) => {
+  const token = extractToken(req);
+  if (token) sessions.delete(token);
+  res.clearCookie("samsuspulse_token");
+  return res.json({ ok: true });
+});
 
-    const store = await loadData();
-    const index = store.posts.findIndex((p) => Number(p.id) === postId);
+app.get("/api/posts", async (req, res) => {
+  const data = await loadData();
+  return res.json({ posts: data.posts });
+});
 
-    if (index === -1) {
-      return res.status(404).json({ error: "Post not found." });
-    }
-
-    const targetPost = store.posts[index];
-    if (!canDeletePost(targetPost, requester)) {
-      return res.status(403).json({
-        error: "Only the post author, an Admin, or a Moderator can delete this post."
-      });
-    }
-
-    store.posts.splice(index, 1);
-    await saveData(store);
-
-    return res.json({ message: "Post deleted.", deletedId: postId });
-  } catch {
-    return res.status(500).json({ error: "Failed to delete post." });
+app.post("/api/posts", async (req, res) => {
+  const auth = getAuthenticatedUser(req);
+  if (!auth) {
+    return res.status(401).json({ error: "Please sign in as a Member or Admin to publish posts." });
   }
+
+  if (auth.user.role === "Guest") {
+    return res.status(403).json({ error: "Guests cannot publish to the live board. Please sign in as a Member or Admin." });
+  }
+
+  const title = String(req.body?.title || "").trim();
+  const content = String(req.body?.content || "").trim();
+
+  if (!title || !content) {
+    return res.status(400).json({ error: "Title and content are required." });
+  }
+
+  const data = await loadData();
+  const nextId = data.posts.reduce((max, p) => Math.max(max, Number(p.id) || 0), 0) + 1;
+
+  const newPost = {
+    id: nextId,
+    author: auth.user.name,
+    role: auth.user.role,
+    title: title.slice(0, 140),
+    content: content.slice(0, 4000),
+    timestamp: new Date().toLocaleString()
+  };
+
+  data.posts.unshift(newPost);
+  await saveData(data);
+
+  return res.status(201).json({ post: newPost });
+});
+
+app.delete("/api/posts/:id", async (req, res) => {
+  const auth = getAuthenticatedUser(req);
+  if (!auth) {
+    return res.status(401).json({ error: "Please sign in to delete posts." });
+  }
+
+  const postId = Number(req.params.id);
+  const data = await loadData();
+  const index = data.posts.findIndex((p) => Number(p.id) === postId);
+
+  if (index === -1) {
+    return res.status(404).json({ error: "Post not found." });
+  }
+
+  const targetPost = data.posts[index];
+  const isAdmin = auth.user.role.toLowerCase() === "admin";
+  const isAuthor =
+    String(targetPost.author || "").trim().toLowerCase() ===
+    String(auth.user.name || "").trim().toLowerCase();
+
+  if (!isAdmin && !isAuthor) {
+    return res.status(403).json({ error: "Only Admins or the post author can delete this post." });
+  }
+
+  data.posts.splice(index, 1);
+  await saveData(data);
+
+  return res.json({ ok: true, deletedId: postId });
 });
 
 app.listen(PORT, () => {
-  console.log(`SamsusPulse Express server running on http://localhost:${PORT}`);
+  console.log(`SamsusPulse server running at http://localhost:${PORT}`);
 });
