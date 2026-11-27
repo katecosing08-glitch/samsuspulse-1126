@@ -213,7 +213,9 @@
   </div>
 
   <script>
-    const existingSession = JSON.parse(localStorage.getItem("samsuspulse_user") || "null");
+    const existingSession = JSON.parse(sessionStorage.getItem("samsuspulse_user") || "null");
+// inside saveSessionAndRedirect(payload):
+sessionStorage.setItem("samsuspulse_user", JSON.stringify(userObj));;
     if (existingSession && (existingSession.email || existingSession.username)) {
       window.location.href = "/index.html";
     }
