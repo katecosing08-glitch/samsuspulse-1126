@@ -7,7 +7,8 @@
   <style>
     :root {
       --bg: #0a0a0c;
-      --card: rgba(22, 22, 28, 0.88);
+      --surface: rgba(22, 22, 28, 0.88);
+      --surface-elevated: rgba(30, 30, 38, 0.92);
       --crimson: #dc143c;
       --wine: #800020;
       --gold: #f5c542;
@@ -16,298 +17,479 @@
       --border: rgba(255, 255, 255, 0.1);
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
 
     body {
       min-height: 100vh;
       background: radial-gradient(circle at top right, #2b0711, var(--bg) 55%);
       color: var(--text);
-      padding: 24px;
+      padding: 28px 20px 60px;
     }
 
-    .container { max-width: 960px; margin: 0 auto; }
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+    }
 
     .topbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 12px;
-      padding: 16px 22px;
-      background: var(--card);
+      background: var(--surface);
+      backdrop-filter: blur(16px);
       border: 1px solid var(--border);
-      border-radius: 16px;
+      border-radius: 18px;
+      padding: 18px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
       margin-bottom: 24px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
     }
 
-    .brand { font-size: 1.3rem; font-weight: 800; }
-    .brand span { color: var(--crimson); }
-    .brand small { color: var(--gold); font-size: 0.78rem; margin-left: 8px; text-transform: uppercase; }
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: 0.4px;
+    }
 
-    .nav-actions { display: flex; gap: 10px; align-items: center; }
+    .brand-title span.pulse {
+      color: var(--crimson);
+    }
 
-    .btn {
-      padding: 10px 16px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: rgba(255, 255, 255, 0.05);
-      color: var(--text);
+    .brand-title span.tag {
+      color: var(--muted);
+      font-size: 0.85rem;
       font-weight: 600;
-      font-size: 0.9rem;
+      letter-spacing: 1.5px;
+      margin-left: 6px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    button,
+    a.btn-link {
+      border: none;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 0.88rem;
+      font-weight: 700;
       cursor: pointer;
       text-decoration: none;
-      transition: 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.15s, box-shadow 0.2s, border-color 0.2s, color 0.2s;
     }
-
-    .btn:hover { border-color: var(--gold); color: var(--gold); }
 
     .btn-primary {
       background: linear-gradient(135deg, var(--crimson), var(--wine));
-      border: none;
       color: #fff;
-      box-shadow: 0 6px 20px rgba(220, 20, 60, 0.35);
     }
 
-    .btn-primary:hover { opacity: 0.92; color: #fff; }
-
-    .btn-delete {
-      padding: 6px 12px;
-      border-radius: 8px;
-      border: 1px solid rgba(248, 113, 113, 0.35);
-      background: rgba(220, 20, 60, 0.14);
-      color: #fca5a5;
-      font-size: 0.78rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: 0.2s;
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px rgba(220, 20, 60, 0.35);
     }
 
-    .btn-delete:hover {
-      background: rgba(220, 20, 60, 0.3);
-      color: #fff;
+    .btn-ghost {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .btn-ghost:hover {
+      border-color: var(--gold);
+      color: var(--gold);
     }
 
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      grid-template-columns: repeat(3, 1fr);
       gap: 16px;
       margin-bottom: 24px;
     }
 
-    .stat-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 20px;
+    @media (max-width: 720px) {
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
     }
 
-    .stat-label { color: var(--muted); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.5px; }
-    .stat-value { font-size: 1.4rem; font-weight: 700; margin-top: 6px; color: var(--gold); }
+    .stat-card {
+      background: var(--surface);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px 22px;
+    }
+
+    .stat-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .stat-value.role-accent {
+      color: var(--gold);
+    }
 
     .about-card {
-      background: var(--card);
+      background: var(--surface);
+      backdrop-filter: blur(16px);
       border: 1px solid var(--border);
       border-left: 4px solid var(--gold);
       border-radius: 16px;
-      padding: 20px;
-      margin-bottom: 24px;
+      padding: 20px 24px;
+      margin-bottom: 32px;
     }
 
     .about-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      flex-wrap: wrap;
-      gap: 8px;
+      gap: 12px;
       margin-bottom: 8px;
     }
 
-    .about-title { font-size: 1.05rem; color: var(--gold); }
-    .about-tag { font-size: 0.78rem; color: var(--muted); }
-    .about-body { color: #d1d5db; font-size: 0.94rem; line-height: 1.6; }
+    .about-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--gold);
+    }
 
-    .feed-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+    .about-meta {
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    .about-text {
+      font-size: 0.92rem;
+      color: #d1d5db;
+      line-height: 1.6;
+    }
+
+    .section-heading {
+      font-size: 1.35rem;
+      font-weight: 800;
       margin-bottom: 16px;
+      color: #fff;
+    }
+
+    .feed-list {
+      display: grid;
+      gap: 16px;
     }
 
     .post-card {
-      background: var(--card);
+      background: var(--surface-elevated);
       border: 1px solid var(--border);
       border-left: 4px solid var(--crimson);
-      border-radius: 14px;
-      padding: 20px;
-      margin-bottom: 14px;
+      border-radius: 16px;
+      padding: 22px 24px;
+      box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
     }
 
-    .post-meta {
+    .post-top {
       display: flex;
+      flex-wrap: wrap;
       justify-content: space-between;
       align-items: center;
-      flex-wrap: wrap;
-      gap: 8px;
-      font-size: 0.82rem;
-      color: var(--muted);
-      margin-bottom: 8px;
+      gap: 12px;
+      margin-bottom: 12px;
     }
 
-    .post-meta-right {
+    .post-author-row {
       display: flex;
       align-items: center;
       gap: 10px;
     }
 
-    .role-pill {
-      background: rgba(220, 20, 60, 0.18);
-      color: #ff6b88;
-      padding: 2px 8px;
-      border-radius: 999px;
-      font-weight: 600;
-      margin-left: 6px;
+    .post-author {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: #fff;
     }
 
-    .post-title { font-size: 1.12rem; font-weight: 700; margin-bottom: 6px; color: #fff; }
-    .post-body { color: #d1d5db; line-height: 1.55; white-space: pre-wrap; }
-    .empty { text-align: center; color: var(--muted); padding: 40px 20px; background: var(--card); border-radius: 16px; }
+    .role-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      background: rgba(220, 20, 60, 0.18);
+      border: 1px solid rgba(220, 20, 60, 0.45);
+      color: #ff859b;
+    }
+
+    .post-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .post-time {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .btn-delete {
+      background: rgba(220, 20, 60, 0.14);
+      border: 1px solid rgba(220, 20, 60, 0.45);
+      color: #ff859b;
+      padding: 6px 12px;
+      font-size: 0.78rem;
+      border-radius: 8px;
+    }
+
+    .btn-delete:hover {
+      background: var(--crimson);
+      color: #fff;
+    }
+
+    .post-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 6px;
+    }
+
+    .post-content {
+      font-size: 0.95rem;
+      color: #d1d5db;
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
+
+    .empty-state,
+    .feedback-banner {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 20px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 16px;
+    }
+
+    .feedback-banner.error {
+      border-color: rgba(255, 107, 129, 0.45);
+      color: #ff6b81;
+    }
   </style>
 </head>
-<body style="display: none;">
+<body>
   <div class="container">
     <header class="topbar">
-      <div class="brand">Samsus<span>Pulse</span> <small>// Dashboard</small></div>
-      <div class="nav-actions">
-        <a href="/publisher.html" class="btn btn-primary">+ Live Board Publisher</a>
-        <button id="refreshBtn" class="btn">Refresh</button>
-        <button id="logoutBtn" class="btn">Logout</button>
+      <div class="brand-title">
+        Samsus<span class="pulse">Pulse</span> <span class="tag">// DASHBOARD</span>
+      </div>
+      <div class="actions">
+        <a href="/publisher.html" class="btn-link btn-primary">+ Live Board Publisher</a>
+        <button type="button" class="btn-ghost" id="refresh-btn">Refresh</button>
+        <button type="button" class="btn-ghost" id="logout-btn">Logout</button>
       </div>
     </header>
 
     <section class="stats-grid">
       <div class="stat-card">
         <div class="stat-label">Active Member</div>
-        <div class="stat-value" id="userName">—</div>
+        <div class="stat-value" id="member-name">Member</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Access Role</div>
-        <div class="stat-value" id="userRole">—</div>
+        <div class="stat-value role-accent" id="member-role">ICT Student</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Live Board Posts</div>
-        <div class="stat-value" id="postCount">0</div>
+        <div class="stat-value" id="post-count">0</div>
       </div>
     </section>
 
-    <section class="about-card" id="aboutSection">
+    <section class="about-card">
       <div class="about-header">
-        <h2 class="about-title">About SamsusPulse</h2>
-        <span class="about-tag">Express.js Live Board</span>
+        <div class="about-title">About SamsusPulse</div>
+        <div class="about-meta">Express.js Live Board</div>
       </div>
-      <p class="about-body">
-        SamsusPulse is a live community board and announcement dashboard powered by a Node.js and Express.js backend.
-        Members can sign in, view real-time board updates, and publish new announcements through the Live Board Publisher.
+      <p class="about-text">
+        SamsusPulse is a live community board and announcement dashboard powered by a Node.js and
+        Express.js backend. Members can sign in, view real-time board updates, and publish new
+        announcements through the Live Board Publisher.
       </p>
     </section>
 
-    <div class="feed-header">
-      <h2>Live Community Feed</h2>
-    </div>
-
-    <div id="feedList">
-      <div class="empty">Loading live board updates...</div>
-    </div>
+    <main>
+      <h2 class="section-heading">Live Community Feed</h2>
+      <div id="feedback-banner" class="feedback-banner error" style="display: none;"></div>
+      <div id="feed-list" class="feed-list"></div>
+    </main>
   </div>
 
   <script>
-    localStorage.removeItem("samsuspulse_user");
-
-    const session = JSON.parse(sessionStorage.getItem("samsuspulse_user") || "null");
-    if (!session) {
+    const rawSession = sessionStorage.getItem("samsuspulse_user");
+    if (!rawSession) {
       window.location.replace("/login.html");
-    } else {
-      document.body.style.display = "";
-      document.getElementById("userName").textContent = session.name || session.username || "Member";
-      document.getElementById("userRole").textContent = session.role || "Member";
     }
 
-    document.getElementById("logoutBtn").addEventListener("click", () => {
+    let currentUser = { name: "Member", role: "ICT Student" };
+    try {
+      if (rawSession) {
+        currentUser = JSON.parse(rawSession);
+      }
+    } catch {
       sessionStorage.removeItem("samsuspulse_user");
       window.location.replace("/login.html");
-    });
-
-    function canCurrentUserDelete(post) {
-      const role = String(session?.role || "").toLowerCase();
-      if (role === "admin" || role === "moderator") {
-        return true;
-      }
-      const currentName = String(session?.name || session?.username || "").trim().toLowerCase();
-      const authorName = String(post?.author || "").trim().toLowerCase();
-      return Boolean(currentName && authorName && currentName === authorName);
     }
 
-    async function deletePost(postId) {
+    const displayName = currentUser.name || currentUser.username || "Member";
+    const displayRole = currentUser.role || "ICT Student";
+
+    document.getElementById("member-name").textContent = displayName;
+    document.getElementById("member-role").textContent = displayRole;
+
+    function escapeHtml(text) {
+      return String(text ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function canDelete(post) {
+      const roleLower = String(displayRole).toLowerCase();
+      if (roleLower === "admin" || roleLower === "moderator") {
+        return true;
+      }
+      const authorLower = String(post.author || "").trim().toLowerCase();
+      const meLower = String(displayName).trim().toLowerCase();
+      return Boolean(authorLower && meLower && authorLower === meLower);
+    }
+
+    function showError(msg) {
+      const banner = document.getElementById("feedback-banner");
+      banner.textContent = msg;
+      banner.style.display = "block";
+    }
+
+    function clearError() {
+      const banner = document.getElementById("feedback-banner");
+      banner.textContent = "";
+      banner.style.display = "none";
+    }
+
+    async function handleDeletePost(postId) {
+      clearError();
       try {
         const res = await fetch(`/api/posts/${encodeURIComponent(postId)}`, {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            name: session?.name || session?.username || "",
-            role: session?.role || ""
+            name: displayName,
+            username: displayName,
+            role: displayRole
           })
         });
         const data = await res.json();
         if (!res.ok) {
-          alert(data.error || "Could not delete post.");
+          showError(data.error || "Could not delete post.");
           return;
         }
         await loadPosts();
       } catch {
-        alert("Network error while deleting post.");
+        showError("Network error while deleting post.");
       }
+    }
+
+    function renderPosts(posts) {
+      const feedList = document.getElementById("feed-list");
+      const postCountEl = document.getElementById("post-count");
+      const list = Array.isArray(posts) ? posts : [];
+
+      postCountEl.textContent = String(list.length);
+
+      if (list.length === 0) {
+        feedList.innerHTML =
+          '<div class="empty-state">No board posts yet. Click <strong>+ Live Board Publisher</strong> to post the first update.</div>';
+        return;
+      }
+
+      feedList.innerHTML = list
+        .map((post) => {
+          const allowDelete = canDelete(post);
+          return `
+            <article class="post-card" data-post-id="${escapeHtml(post.id)}">
+              <div class="post-top">
+                <div class="post-author-row">
+                  <span class="post-author">${escapeHtml(post.author || "Member")}</span>
+                  <span class="role-badge">${escapeHtml(post.role || "Member")}</span>
+                </div>
+                <div class="post-right">
+                  <span class="post-time">${escapeHtml(post.timestamp || "")}</span>
+                  ${
+                    allowDelete
+                      ? `<button type="button" class="btn-delete" data-delete-id="${escapeHtml(post.id)}">Delete</button>`
+                      : ""
+                  }
+                </div>
+              </div>
+              <h3 class="post-title">${escapeHtml(post.title || "")}</h3>
+              <p class="post-content">${escapeHtml(post.content || "")}</p>
+            </article>
+          `;
+        })
+        .join("");
+
+      feedList.querySelectorAll("[data-delete-id]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = btn.getAttribute("data-delete-id");
+          handleDeletePost(id);
+        });
+      });
     }
 
     async function loadPosts() {
-      const feedList = document.getElementById("feedList");
+      clearError();
       try {
         const res = await fetch("/api/posts");
         const data = await res.json();
-        const posts = data.posts || [];
-        document.getElementById("postCount").textContent = posts.length;
-
-        if (!posts.length) {
-          feedList.innerHTML = `<div class="empty">No posts yet. Click <strong>+ Live Board Publisher</strong> to create the first update!</div>`;
+        if (!res.ok) {
+          showError(data.error || "Failed to load posts.");
           return;
         }
-
-        feedList.innerHTML = posts.map(p => {
-          const deletable = canCurrentUserDelete(p);
-          return `
-            <article class="post-card">
-              <div class="post-meta">
-                <span><strong>${escapeHtml(p.author || "Member")}</strong> <span class="role-pill">${escapeHtml(p.role || "Member")}</span></span>
-                <div class="post-meta-right">
-                  <span>${escapeHtml(p.timestamp || "")}</span>
-                  ${deletable ? `<button class="btn-delete" onclick="deletePost(${Number(p.id)})">Delete</button>` : ""}
-                </div>
-              </div>
-              <div class="post-title">${escapeHtml(p.title)}</div>
-              <div class="post-body">${escapeHtml(p.content)}</div>
-            </article>
-          `;
-        }).join("");
+        renderPosts(data.posts);
       } catch {
-        feedList.innerHTML = `<div class="empty">Could not load live board posts right now.</div>`;
+        showError("Unable to reach the SamsusPulse server.");
       }
     }
 
-    function escapeHtml(str) {
-      return String(str).replace(/[&<>"']/g, m => ({
-        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-      }[m]));
-    }
+    document.getElementById("refresh-btn").addEventListener("click", loadPosts);
 
-    document.getElementById("refreshBtn").addEventListener("click", loadPosts);
+    document.getElementById("logout-btn").addEventListener("click", () => {
+      sessionStorage.removeItem("samsuspulse_user");
+      localStorage.removeItem("samsuspulse_user");
+      window.location.replace("/login.html");
+    });
+
     loadPosts();
   </script>
 </body>
