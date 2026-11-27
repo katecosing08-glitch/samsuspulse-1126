@@ -265,12 +265,12 @@
       <h1>SamsusPulse</h1>
       <p class="description">
         A live community board and announcement dashboard powered by Node.js and Express.js.
-        Trigger a 6-digit device alert PIN directly on your screen—no email or password needed.
+        Sign in with your name and role using a 6-digit device alert PIN.
       </p>
       <div class="features">
-        <div><span class="dot"></span> Instant on-screen device alert 6-digit PIN verification</div>
-        <div><span class="dot"></span> Shared live community feed with author, admin &amp; moderator delete controls</div>
-        <div><span class="dot"></span> Tab-scoped session that requires login again when the tab closes</div>
+        <div><span class="dot"></span> Dynamic identity detection for Admin, Member, and Guest visitors</div>
+        <div><span class="dot"></span> Shared live community feed with author &amp; admin delete controls</div>
+        <div><span class="dot"></span> Isolated tab session so each user sees their own profile</div>
       </div>
     </div>
 
@@ -278,32 +278,29 @@
       <!-- Step 1: Request Device PIN -->
       <form id="request-pin-form">
         <div class="step-title">Device Alert Login</div>
-        <p class="step-sub">Send a 6-digit one-time PIN directly to this device.</p>
+        <p class="step-sub">Enter your name and role to receive a 6-digit PIN on this device.</p>
 
         <div class="form-group">
           <label for="device">Device Name / Label</label>
           <input
             type="text"
             id="device"
-            placeholder="This Device (e.g. Laptop or Phone)"
+            placeholder="e.g. Friend's Phone or Laptop"
             value="This Device"
           />
         </div>
 
         <div class="form-group">
-          <label for="name">Display Name (used if new account)</label>
-          <input type="text" id="name" placeholder="Samantha Kate" />
+          <label for="name">Your Display Name</label>
+          <input type="text" id="name" placeholder="Enter your name (leave blank for Guest)" />
         </div>
 
         <div class="form-group">
-          <label for="role">Track / Role (used if new account)</label>
+          <label for="role">Role</label>
           <select id="role">
-            <option value="ICT Student">ICT Student</option>
-            <option value="Web Developer">Web Developer</option>
-            <option value="UI/UX Designer">UI/UX Designer</option>
-            <option value="Moderator">Moderator</option>
+            <option value="Member" selected>Member</option>
             <option value="Admin">Admin</option>
-            <option value="Guest Explorer">Guest Explorer</option>
+            <option value="Guest">Guest</option>
           </select>
         </div>
 
@@ -331,7 +328,7 @@
         </div>
 
         <button type="submit" id="verify-pin-btn">Verify &amp; Access Dashboard</button>
-        <button type="button" class="btn-secondary" id="back-btn">Change Device / Resend PIN</button>
+        <button type="button" class="btn-secondary" id="back-btn">Change Details / Resend PIN</button>
         <div class="status" id="verify-status"></div>
       </form>
     </div>
@@ -339,24 +336,32 @@
 
   <script>
     localStorage.removeItem("samsuspulse_user");
+    localStorage.removeItem("samsuspulse_token");
 
-    if (sessionStorage.getItem("samsuspulse_user")) {
-      window.location.replace("/index.html");
-    }
-
+    let activeRequestId = "";
     let activeDevice = "This Device";
 
     const requestForm = document.getElementById("request-pin-form");
     const verifyForm = document.getElementById("verify-pin-form");
+    const roleSelect = document.getElementById("role");
+    const nameInput = document.getElementById("name");
     const toastEl = document.getElementById("device-toast");
     const toastMsgEl = document.getElementById("toast-message");
     const toastPinEl = document.getElementById("toast-pin-value");
 
-    function showDeviceAlert(device, pin, minutes = 5) {
-      toastMsgEl.textContent = `New login PIN for ${device} (valid for ${minutes} mins):`;
+    function showDeviceAlert(device, name, role, pin, minutes = 5) {
+      toastMsgEl.textContent = `Login PIN for ${name} (${role}) on ${device} (${minutes}m):`;
       toastPinEl.textContent = pin;
       toastEl.classList.remove("hidden");
     }
+
+    roleSelect.addEventListener("change", () => {
+      if (roleSelect.value === "Guest" && !nameInput.value.trim()) {
+        nameInput.placeholder = "Guest (optional)";
+      } else {
+        nameInput.placeholder = "Enter your name";
+      }
+    });
 
     document.getElementById("close-toast-btn").addEventListener("click", () => {
       toastEl.classList.add("hidden");
@@ -367,8 +372,15 @@
       const statusEl = document.getElementById("request-status");
       const btn = document.getElementById("send-pin-btn");
       const device = document.getElementById("device").value.trim() || "This Device";
-      const name = document.getElementById("name").value.trim();
-      const role = document.getElementById("role").value;
+      const role = roleSelect.value;
+      const rawName = nameInput.value.trim();
+      const name = role === "Guest" && !rawName ? "Guest" : rawName;
+
+      if (!name) {
+        statusEl.className = "status error";
+        statusEl.textContent = "Please enter your name or choose Guest.";
+        return;
+      }
 
       statusEl.className = "status";
       statusEl.textContent = "Sending device alert...";
@@ -386,12 +398,15 @@
           statusEl.className = "status error";
           statusEl.textContent = data.error || "Could not send device alert.";
         } else {
+          activeRequestId = data.requestId || "";
           activeDevice = device;
           document.getElementById("pin-target-label").textContent =
-            `Enter the 6-digit PIN from the device alert for ${device} (valid for 5 minutes).`;
+            `Enter the 6-digit PIN for ${name} (${role}) on ${device}.`;
           if (data.deviceAlert?.pin) {
             showDeviceAlert(
               data.deviceAlert.device || device,
+              data.deviceAlert.name || name,
+              data.deviceAlert.role || role,
               data.deviceAlert.pin,
               data.deviceAlert.expiresInMinutes || 5
             );
@@ -424,7 +439,7 @@
         const res = await fetch("/api/auth/verify-pin", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ device: activeDevice, pin })
+          body: JSON.stringify({ requestId: activeRequestId, device: activeDevice, pin })
         });
         const data = await res.json();
 
@@ -436,9 +451,12 @@
           statusEl.textContent = (data.message || "Verified!") + " Redirecting...";
           toastEl.classList.add("hidden");
           sessionStorage.setItem("samsuspulse_user", JSON.stringify(data.user));
+          if (data.token) {
+            sessionStorage.setItem("samsuspulse_token", data.token);
+          }
           setTimeout(() => {
             window.location.replace("/index.html");
-          }, 500);
+          }, 400);
         }
       } catch {
         statusEl.className = "status error";
@@ -449,6 +467,7 @@
     });
 
     document.getElementById("back-btn").addEventListener("click", () => {
+      activeRequestId = "";
       verifyForm.classList.add("hidden");
       requestForm.classList.remove("hidden");
       document.getElementById("pin").value = "";
