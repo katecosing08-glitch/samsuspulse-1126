@@ -21,7 +21,7 @@
       "name": "New Member",
       "username": "newmember",
       "email": "member@example.com",
-      "password": "password",
+      "password": "passwordHash",
       "role": "Member"
     }
   ],
