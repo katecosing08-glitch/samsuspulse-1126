@@ -265,20 +265,6 @@
       color: #fff;
     }
 
-    .post-title {
-      font-size: 1.15rem;
-      font-weight: 800;
-      color: #fff;
-      margin-bottom: 6px;
-    }
-
-    .post-content {
-      font-size: 0.95rem;
-      color: #d1d5db;
-      line-height: 1.55;
-      white-space: pre-wrap;
-    }
-
     .empty-state,
     .feedback-banner {
       background: var(--surface);
@@ -295,29 +281,43 @@
       border-color: rgba(255, 107, 129, 0.45);
       color: #ff6b81;
     }
+
+    .post-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 6px;
+    }
+
+    .post-content {
+      font-size: 0.95rem;
+      color: #d1d5db;
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
   </style>
 </head>
-<body>
+<body style="display: none;">
   <div class="container">
     <header class="topbar">
       <div class="brand-title">
         Samsus<span class="pulse">Pulse</span> <span class="tag">// DASHBOARD</span>
       </div>
       <div class="actions">
-        <a href="/publisher.html" class="btn-link btn-primary">+ Live Board Publisher</a>
+        <a href="/publisher.html" class="btn-link btn-primary" id="publisher-link">+ Live Board Publisher</a>
         <button type="button" class="btn-ghost" id="refresh-btn">Refresh</button>
-        <button type="button" class="btn-ghost" id="logout-btn">Logout</button>
+        <button type="button" class="btn-ghost" id="auth-action-btn">Sign Out</button>
       </div>
     </header>
 
     <section class="stats-grid">
       <div class="stat-card">
-        <div class="stat-label">Active Member</div>
-        <div class="stat-value" id="member-name">Member</div>
+        <div class="stat-label">Active Visitor</div>
+        <div class="stat-value" id="member-name">Guest</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Access Role</div>
-        <div class="stat-value role-accent" id="member-role">ICT Student</div>
+        <div class="stat-value role-accent" id="member-role">Guest</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Live Board Posts</div>
@@ -332,8 +332,8 @@
       </div>
       <p class="about-text">
         SamsusPulse is a live community board and announcement dashboard powered by a Node.js and
-        Express.js backend. Members can sign in, view real-time board updates, and publish new
-        announcements through the Live Board Publisher.
+        Express.js backend. Guests can browse posts, while verified Members and Admins can publish
+        announcements and manage their own or community posts according to role permissions.
       </p>
     </section>
 
@@ -345,26 +345,93 @@
   </div>
 
   <script>
-    const rawSession = sessionStorage.getItem("samsuspulse_user");
-    if (!rawSession) {
-      window.location.replace("/login.html");
-    }
+    localStorage.removeItem("samsuspulse_user");
+    localStorage.removeItem("samsuspulse_token");
 
-    let currentUser = { name: "Member", role: "ICT Student" };
-    try {
-      if (rawSession) {
-        currentUser = JSON.parse(rawSession);
+    function readSessionUser() {
+      const raw = sessionStorage.getItem("samsuspulse_user");
+      if (!raw) {
+        window.location.replace("/login.html");
+        return { name: "Guest", role: "Guest", isSignedIn: false };
       }
-    } catch {
-      sessionStorage.removeItem("samsuspulse_user");
-      window.location.replace("/login.html");
+
+      try {
+        const parsed = JSON.parse(raw);
+        if (!parsed || !parsed.name || !parsed.role) {
+          sessionStorage.removeItem("samsuspulse_user");
+          sessionStorage.removeItem("samsuspulse_token");
+          window.location.replace("/login.html");
+          return { name: "Guest", role: "Guest", isSignedIn: false };
+        }
+        const role = String(parsed.role).trim();
+        return {
+          name: String(parsed.name).trim(),
+          role,
+          isSignedIn: role.toLowerCase() !== "guest"
+        };
+      } catch {
+        sessionStorage.removeItem("samsuspulse_user");
+        sessionStorage.removeItem("samsuspulse_token");
+        window.location.replace("/login.html");
+        return { name: "Guest", role: "Guest", isSignedIn: false };
+      }
     }
 
-    const displayName = currentUser.name || currentUser.username || "Member";
-    const displayRole = currentUser.role || "ICT Student";
+    let currentIdentity = readSessionUser();
 
-    document.getElementById("member-name").textContent = displayName;
-    document.getElementById("member-role").textContent = displayRole;
+    function applyIdentityUI() {
+      document.getElementById("member-name").textContent = currentIdentity.name;
+      document.getElementById("member-role").textContent = currentIdentity.role;
+
+      const authBtn = document.getElementById("auth-action-btn");
+      const publisherLink = document.getElementById("publisher-link");
+
+      const hasSession = Boolean(sessionStorage.getItem("samsuspulse_user"));
+      if (hasSession) {
+        authBtn.textContent = "Sign Out";
+        authBtn.onclick = async () => {
+          const token = sessionStorage.getItem("samsuspulse_token");
+          try {
+            await fetch("/api/auth/logout", {
+              method: "POST",
+              headers: token ? { Authorization: `Bearer ${token}` } : {}
+            });
+          } catch {}
+          sessionStorage.removeItem("samsuspulse_user");
+          sessionStorage.removeItem("samsuspulse_token");
+          window.location.replace("/login.html");
+        };
+      }
+      if (!currentIdentity.isSignedIn) {
+        publisherLink.title = "Sign in as a Member or Admin to publish";
+      }
+    }
+
+    async function syncSessionFromServer() {
+      const token = sessionStorage.getItem("samsuspulse_token");
+      try {
+        const res = await fetch("/api/auth/me", {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.authenticated || !data.user) {
+      sessionStorage.removeItem("samsuspulse_user");
+      sessionStorage.removeItem("samsuspulse_token");
+      window.location.replace("/login.html");
+      return;
+    }
+
+    const role = String(data.user.role || "Member").trim();
+    currentIdentity = {
+      name: String(data.user.name || "Member").trim(),
+      role,
+      isSignedIn: role.toLowerCase() !== "guest"
+    };
+    sessionStorage.setItem("samsuspulse_user", JSON.stringify(data.user));
+    applyIdentityUI();
+      } catch {}
+    }
 
     function escapeHtml(text) {
       return String(text ?? "")
@@ -376,12 +443,11 @@
     }
 
     function canDelete(post) {
-      const roleLower = String(displayRole).toLowerCase();
-      if (roleLower === "admin" || roleLower === "moderator") {
-        return true;
-      }
+      if (!currentIdentity.isSignedIn) return false;
+      const roleLower = String(currentIdentity.role || "").toLowerCase();
+      if (roleLower === "admin") return true;
       const authorLower = String(post.author || "").trim().toLowerCase();
-      const meLower = String(displayName).trim().toLowerCase();
+      const meLower = String(currentIdentity.name || "").trim().toLowerCase();
       return Boolean(authorLower && meLower && authorLower === meLower);
     }
 
@@ -399,15 +465,14 @@
 
     async function handleDeletePost(postId) {
       clearError();
+      const token = sessionStorage.getItem("samsuspulse_token");
       try {
         const res = await fetch(`/api/posts/${encodeURIComponent(postId)}`, {
           method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: displayName,
-            username: displayName,
-            role: displayRole
-          })
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          }
         });
         const data = await res.json();
         if (!res.ok) {
@@ -482,15 +547,14 @@
       }
     }
 
+    applyIdentityUI();
     document.getElementById("refresh-btn").addEventListener("click", loadPosts);
 
-    document.getElementById("logout-btn").addEventListener("click", () => {
-      sessionStorage.removeItem("samsuspulse_user");
-      localStorage.removeItem("samsuspulse_user");
-      window.location.replace("/login.html");
-    });
-
-    loadPosts();
+    (async () => {
+      await syncSessionFromServer();
+      document.body.style.display = "";
+      await loadPosts();
+    })();
   </script>
 </body>
 </html>
