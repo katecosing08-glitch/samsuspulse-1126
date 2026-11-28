@@ -198,6 +198,40 @@
 
     input:focus, select:focus { border-color: var(--crimson); }
 
+    .admin-box {
+      padding: 14px;
+      border-radius: 12px;
+      background: rgba(220, 20, 60, 0.08);
+      border: 1px solid rgba(245, 197, 66, 0.28);
+      margin-bottom: 16px;
+    }
+
+    .admin-slot-note {
+      font-size: 0.78rem;
+      color: var(--gold);
+      margin-bottom: 10px;
+      line-height: 1.4;
+    }
+
+    .link-btn {
+      background: none;
+      border: none;
+      color: var(--gold);
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-decoration: underline;
+      cursor: pointer;
+      width: auto;
+      padding: 0;
+      margin-top: 4px;
+    }
+
+    .link-btn:hover {
+      box-shadow: none;
+      transform: none;
+      color: #fff;
+    }
+
     .pin-input {
       letter-spacing: 8px;
       font-size: 1.25rem;
@@ -304,8 +338,63 @@
           </select>
         </div>
 
+        <!-- Admin Invite + Personal Password Section -->
+        <div id="admin-auth-box" class="admin-box hidden">
+          <div class="admin-slot-note" id="admin-slot-note">
+            Checking Admin slots...
+          </div>
+
+          <div class="form-group" id="invite-code-group">
+            <label for="invite-code">Admin Invite Code (First-Time Admin Sign-Up)</label>
+            <input
+              type="password"
+              id="invite-code"
+              placeholder="Enter invite code to claim an Admin slot"
+            />
+          </div>
+
+          <div class="form-group" style="margin-bottom: 8px;">
+            <label for="admin-password" id="admin-password-label">Create Your Personal Admin Password</label>
+            <input
+              type="password"
+              id="admin-password"
+              placeholder="Minimum 6 characters"
+              autocomplete="current-password"
+            />
+          </div>
+
+          <button type="button" class="link-btn" id="open-change-pw-btn">
+            Already an Admin? Change your password
+          </button>
+        </div>
+
         <button type="submit" id="send-pin-btn">Send Device Alert PIN</button>
         <div class="status" id="request-status"></div>
+      </form>
+
+      <!-- Change Admin Password Form -->
+      <form id="change-password-form" class="hidden">
+        <div class="step-title">Change Admin Password</div>
+        <p class="step-sub">Update the personal password for your registered Admin account.</p>
+
+        <div class="form-group">
+          <label for="cp-name">Admin Display Name</label>
+          <input type="text" id="cp-name" placeholder="Enter your registered Admin name" required />
+        </div>
+
+        <div class="form-group">
+          <label for="cp-current">Current Password</label>
+          <input type="password" id="cp-current" placeholder="Enter current password" required />
+        </div>
+
+        <div class="form-group">
+          <label for="cp-new">New Password (Min 6 Characters)</label>
+          <input type="password" id="cp-new" placeholder="Enter new password" minlength="6" required />
+        </div>
+
+        <button type="submit" id="cp-submit-btn">Save New Admin Password</button>
+        <button type="button" class="btn-secondary" id="cp-cancel-btn">Back to Login</button>
+        <div class="status" id="cp-status"></div>
       </form>
 
       <!-- Step 2: Verify Device PIN -->
@@ -340,11 +429,19 @@
 
     let activeRequestId = "";
     let activeDevice = "This Device";
+    let adminCheckTimer = null;
 
     const requestForm = document.getElementById("request-pin-form");
     const verifyForm = document.getElementById("verify-pin-form");
+    const changePwForm = document.getElementById("change-password-form");
     const roleSelect = document.getElementById("role");
     const nameInput = document.getElementById("name");
+    const adminAuthBox = document.getElementById("admin-auth-box");
+    const adminSlotNote = document.getElementById("admin-slot-note");
+    const inviteCodeGroup = document.getElementById("invite-code-group");
+    const inviteCodeInput = document.getElementById("invite-code");
+    const adminPasswordLabel = document.getElementById("admin-password-label");
+    const adminPasswordInput = document.getElementById("admin-password");
     const toastEl = document.getElementById("device-toast");
     const toastMsgEl = document.getElementById("toast-message");
     const toastPinEl = document.getElementById("toast-pin-value");
@@ -355,16 +452,113 @@
       toastEl.classList.remove("hidden");
     }
 
-    roleSelect.addEventListener("change", () => {
-      if (roleSelect.value === "Guest" && !nameInput.value.trim()) {
+    async function refreshAdminStatus() {
+      if (roleSelect.value !== "Admin") return;
+      const typedName = nameInput.value.trim();
+      try {
+        const res = await fetch(`/api/auth/admin-status?name=${encodeURIComponent(typedName)}`);
+        const data = await res.json();
+        if (!res.ok) return;
+
+        if (data.isRegistered) {
+          adminSlotNote.textContent =
+            `Registered Admin detected (${data.registeredCount}/${data.maxAdmins} slots used). Enter your personal password.`;
+          inviteCodeGroup.classList.add("hidden");
+          inviteCodeInput.required = false;
+          adminPasswordLabel.textContent = "Your Personal Admin Password";
+        } else {
+          adminSlotNote.textContent =
+            `Admin Slots: ${data.registeredCount}/${data.maxAdmins} claimed (${data.slotsRemaining} remaining).`;
+          inviteCodeGroup.classList.remove("hidden");
+          inviteCodeInput.required = data.slotsRemaining > 0;
+          adminPasswordLabel.textContent = "Create Your Personal Admin Password";
+        }
+      } catch {}
+    }
+
+    function updateRoleUI() {
+      const role = roleSelect.value;
+      if (role === "Admin") {
+        adminAuthBox.classList.remove("hidden");
+        adminPasswordInput.required = true;
+        refreshAdminStatus();
+      } else {
+        adminAuthBox.classList.add("hidden");
+        adminPasswordInput.required = false;
+        inviteCodeInput.required = false;
+      }
+
+      if (role === "Guest" && !nameInput.value.trim()) {
         nameInput.placeholder = "Guest (optional)";
       } else {
         nameInput.placeholder = "Enter your name";
       }
+    }
+
+    roleSelect.addEventListener("change", updateRoleUI);
+
+    nameInput.addEventListener("input", () => {
+      if (roleSelect.value !== "Admin") return;
+      clearTimeout(adminCheckTimer);
+      adminCheckTimer = setTimeout(refreshAdminStatus, 250);
     });
 
     document.getElementById("close-toast-btn").addEventListener("click", () => {
       toastEl.classList.add("hidden");
+    });
+
+    document.getElementById("open-change-pw-btn").addEventListener("click", () => {
+      document.getElementById("cp-name").value = nameInput.value.trim();
+      document.getElementById("cp-current").value = "";
+      document.getElementById("cp-new").value = "";
+      document.getElementById("cp-status").textContent = "";
+      requestForm.classList.add("hidden");
+      changePwForm.classList.remove("hidden");
+    });
+
+    document.getElementById("cp-cancel-btn").addEventListener("click", () => {
+      changePwForm.classList.add("hidden");
+      requestForm.classList.remove("hidden");
+    });
+
+    changePwForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const statusEl = document.getElementById("cp-status");
+      const btn = document.getElementById("cp-submit-btn");
+      const name = document.getElementById("cp-name").value.trim();
+      const currentPassword = document.getElementById("cp-current").value;
+      const newPassword = document.getElementById("cp-new").value;
+
+      statusEl.className = "status";
+      statusEl.textContent = "Updating password...";
+      btn.disabled = true;
+
+      try {
+        const res = await fetch("/api/auth/change-admin-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, currentPassword, newPassword })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          statusEl.className = "status error";
+          statusEl.textContent = data.error || "Could not update password.";
+        } else {
+          statusEl.className = "status success";
+          statusEl.textContent = data.message;
+          nameInput.value = name;
+          setTimeout(() => {
+            changePwForm.classList.add("hidden");
+            requestForm.classList.remove("hidden");
+            updateRoleUI();
+          }, 1100);
+        }
+      } catch {
+        statusEl.className = "status error";
+        statusEl.textContent = "Network error while updating password.";
+      } finally {
+        btn.disabled = false;
+      }
     });
 
     requestForm.addEventListener("submit", async (e) => {
@@ -390,7 +584,13 @@
         const res = await fetch("/api/auth/request-pin", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ device, name, role })
+          body: JSON.stringify({
+            device,
+            name,
+            role,
+            inviteCode: role === "Admin" ? inviteCodeInput.value.trim() : "",
+            adminPassword: role === "Admin" ? adminPasswordInput.value : ""
+          })
         });
         const data = await res.json();
 
@@ -474,6 +674,8 @@
       document.getElementById("verify-status").textContent = "";
       document.getElementById("request-status").textContent = "";
     });
+
+    updateRoleUI();
   </script>
 </body>
 </html>
