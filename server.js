@@ -1,4 +1,3 @@
-import "dotenv/config";
 import express from "express";
 import crypto from "node:crypto";
 import { join, dirname } from "node:path";
