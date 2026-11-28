@@ -26,6 +26,7 @@ app.use(express.static(join(__dirname, "public")));
 
 const defaultData = {
   users: [],
+  usedInviteCodes: [],
   posts: [
     {
       id: 1,
@@ -67,12 +68,14 @@ async function loadData() {
     const parsed = JSON.parse(raw);
     return {
       users: Array.isArray(parsed.users) ? parsed.users : [],
+      usedInviteCodes: Array.isArray(parsed.usedInviteCodes) ? parsed.usedInviteCodes : [],
       posts: Array.isArray(parsed.posts) ? parsed.posts : [...defaultData.posts]
     };
   } catch {
     await saveData(defaultData);
     return {
       users: [...defaultData.users],
+      usedInviteCodes: [...defaultData.usedInviteCodes],
       posts: [...defaultData.posts]
     };
   }
@@ -187,7 +190,7 @@ app.post("/api/auth/change-admin-password", async (req, res) => {
   return res.json({ message: "Admin password updated successfully! You can now sign in with your new password." });
 });
 
-// Step 1: Request a 6-digit PIN (enforces Option B Admin sign-up / login rules)
+// Step 1: Request a 6-digit PIN (one-time invite code for new Admin; password-only for existing Admin)
 app.post("/api/auth/request-pin", async (req, res) => {
   const device = String(req.body?.device || "This Device").trim().slice(0, 80) || "This Device";
   const role = normalizeRole(req.body?.role);
@@ -199,6 +202,7 @@ app.post("/api/auth/request-pin", async (req, res) => {
   }
 
   let pendingAdminPasswordHash = "";
+  let consumedInviteCodeHash = "";
 
   if (role === "Admin") {
     const adminPassword = String(req.body?.adminPassword || "");
@@ -213,13 +217,13 @@ app.post("/api/auth/request-pin", async (req, res) => {
     const existingAdmin = admins.find((a) => nameKey(a.name) === nameKey(name));
 
     if (existingAdmin) {
-      // Returning Admin: verify personal password
+      // Existing Admin account: only needs their personal Admin password (+ PIN)
       if (hashPassword(adminPassword) !== existingAdmin.passwordHash) {
         return res.status(401).json({ error: "Incorrect personal Admin password." });
       }
       pendingAdminPasswordHash = existingAdmin.passwordHash;
     } else {
-      // First-time Admin sign-up: check 5-Admin cap + invite code
+      // First-time Admin sign-up: check 5-Admin cap + one-time invite code
       if (admins.length >= MAX_ADMINS) {
         return res.status(403).json({
           error: `Admin limit reached (${MAX_ADMINS} admins maximum). Please sign in as Member or Guest.`
@@ -232,7 +236,15 @@ app.post("/api/auth/request-pin", async (req, res) => {
         });
       }
 
+      const codeHash = hashPassword(inviteCode);
+      if (data.usedInviteCodes.includes(codeHash)) {
+        return res.status(403).json({
+          error: "This Admin Invite Code has already been used."
+        });
+      }
+
       pendingAdminPasswordHash = hashPassword(adminPassword);
+      consumedInviteCodeHash = codeHash;
     }
   }
 
@@ -246,6 +258,7 @@ app.post("/api/auth/request-pin", async (req, res) => {
     name,
     role,
     adminPasswordHash: pendingAdminPasswordHash,
+    inviteCodeHash: consumedInviteCodeHash,
     pinHash: hashPassword(pin),
     expiresAt,
     attempts: 0
@@ -296,7 +309,6 @@ app.post("/api/auth/verify-pin", async (req, res) => {
 
   const data = await loadData();
 
-  // Double-check Admin slot cap at verification time in case two sign-ups raced
   if (entry.role === "Admin") {
     const admins = getRegisteredAdmins(data.users);
     const alreadyExists = admins.some((a) => nameKey(a.name) === nameKey(entry.name));
@@ -304,6 +316,12 @@ app.post("/api/auth/verify-pin", async (req, res) => {
       pendingPins.delete(requestId);
       return res.status(403).json({
         error: `Admin limit reached (${MAX_ADMINS} admins maximum).`
+      });
+    }
+    if (!alreadyExists && entry.inviteCodeHash && data.usedInviteCodes.includes(entry.inviteCodeHash)) {
+      pendingPins.delete(requestId);
+      return res.status(403).json({
+        error: "This Admin Invite Code has already been used."
       });
     }
   }
@@ -342,6 +360,12 @@ app.post("/api/auth/verify-pin", async (req, res) => {
       lastLoginAt: new Date().toISOString()
     };
     data.users.push(savedUser);
+  }
+
+  if (entry.role === "Admin" && existingIndex === -1 && entry.inviteCodeHash) {
+    if (!data.usedInviteCodes.includes(entry.inviteCodeHash)) {
+      data.usedInviteCodes.push(entry.inviteCodeHash);
+    }
   }
 
   await saveData(data);
@@ -425,7 +449,12 @@ app.delete("/api/posts/:id", async (req, res) => {
     return res.status(401).json({ error: "Please sign in to delete posts." });
   }
 
-  const postId = Number(req.params.id);
+  const rawId = String(req.params.id || "").trim();
+  const postId = Number(rawId);
+  if (!rawId || !Number.isFinite(postId)) {
+    return res.status(400).json({ error: "Invalid or missing post ID." });
+  }
+
   const data = await loadData();
   const index = data.posts.findIndex((p) => Number(p.id) === postId);
 
