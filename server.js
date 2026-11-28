@@ -1,8 +1,10 @@
+import "dotenv/config";
 import express from "express";
 import crypto from "node:crypto";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readFile, writeFile } from "node:fs/promises";
+import { hashPassword, canDeletePost } from "./netlify/functions/auth.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -12,6 +14,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const PIN_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const MAX_ADMINS = Math.min(5, Math.max(3, Number(process.env.MAX_ADMINS || 5)));
+const ADMIN_INVITE_CODE = String(process.env.ADMIN_INVITE_CODE || "SamsusInvite2026").trim();
 
 const ALLOWED_ROLES = new Set(["Admin", "Member", "Guest"]);
 
@@ -45,13 +49,13 @@ function normalizeRole(rawRole) {
 }
 
 function normalizeName(rawName, role) {
-  const cleaned = String(rawName || "").trim();
+  const cleaned = String(rawName || "").trim().replace(/\s+/g, " ");
   if (cleaned) return cleaned.slice(0, 60);
   return role === "Guest" ? "Guest" : "Member";
 }
 
-function hashValue(value) {
-  return crypto.createHash("sha256").update(String(value)).digest("hex");
+function nameKey(name) {
+  return String(name || "").trim().replace(/\s+/g, " ").toLowerCase();
 }
 
 function generateSixDigitPin() {
@@ -77,6 +81,12 @@ async function loadData() {
 
 async function saveData(data) {
   await writeFile(DATA_FILE, JSON.stringify(data, null, 2), "utf8");
+}
+
+function getRegisteredAdmins(users) {
+  return users.filter(
+    (u) => String(u.role || "").toLowerCase() === "admin" && Boolean(u.passwordHash)
+  );
 }
 
 function extractToken(req) {
@@ -112,7 +122,7 @@ function getAuthenticatedUser(req) {
   };
 }
 
-// Return current visitor identity (Guest if not signed in)
+// Check current visitor identity
 app.get("/api/auth/me", (req, res) => {
   const auth = getAuthenticatedUser(req);
   if (!auth) {
@@ -127,14 +137,104 @@ app.get("/api/auth/me", (req, res) => {
   });
 });
 
-// Step 1: Request a 6-digit PIN tied to a specific requestId, name, role, and device
+// Check how many Admin slots remain & whether a given name is already a registered Admin
+app.get("/api/auth/admin-status", async (req, res) => {
+  const data = await loadData();
+  const admins = getRegisteredAdmins(data.users);
+  const queryName = nameKey(req.query?.name || "");
+  const isRegistered = queryName
+    ? admins.some((a) => nameKey(a.name) === queryName)
+    : false;
+
+  return res.json({
+    maxAdmins: MAX_ADMINS,
+    registeredCount: admins.length,
+    slotsRemaining: Math.max(0, MAX_ADMINS - admins.length),
+    isRegistered
+  });
+});
+
+// Change a registered Admin's personal password
+app.post("/api/auth/change-admin-password", async (req, res) => {
+  const cleanName = nameKey(req.body?.name || "");
+  const currentPassword = String(req.body?.currentPassword || "");
+  const newPassword = String(req.body?.newPassword || "");
+
+  if (!cleanName || !currentPassword || !newPassword) {
+    return res.status(400).json({ error: "Name, current password, and new password are required." });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: "New password must be at least 6 characters." });
+  }
+
+  const data = await loadData();
+  const adminIndex = data.users.findIndex(
+    (u) => String(u.role || "").toLowerCase() === "admin" && nameKey(u.name) === cleanName
+  );
+
+  if (adminIndex === -1 || !data.users[adminIndex].passwordHash) {
+    return res.status(404).json({ error: "Admin account not found." });
+  }
+
+  if (hashPassword(currentPassword) !== data.users[adminIndex].passwordHash) {
+    return res.status(401).json({ error: "Current Admin password is incorrect." });
+  }
+
+  data.users[adminIndex].passwordHash = hashPassword(newPassword);
+  data.users[adminIndex].passwordUpdatedAt = new Date().toISOString();
+  await saveData(data);
+
+  return res.json({ message: "Admin password updated successfully! You can now sign in with your new password." });
+});
+
+// Step 1: Request a 6-digit PIN (enforces Option B Admin sign-up / login rules)
 app.post("/api/auth/request-pin", async (req, res) => {
   const device = String(req.body?.device || "This Device").trim().slice(0, 80) || "This Device";
   const role = normalizeRole(req.body?.role);
-  const name = normalizeName(req.body?.name, role);
+  const rawName = String(req.body?.name || "").trim();
+  const name = normalizeName(rawName, role);
 
-  if (role !== "Guest" && !String(req.body?.name || "").trim()) {
+  if (role !== "Guest" && !rawName) {
     return res.status(400).json({ error: "Please enter your display name." });
+  }
+
+  let pendingAdminPasswordHash = "";
+
+  if (role === "Admin") {
+    const adminPassword = String(req.body?.adminPassword || "");
+    const inviteCode = String(req.body?.inviteCode || "").trim();
+
+    if (!adminPassword || adminPassword.length < 6) {
+      return res.status(400).json({ error: "Admin password is required (minimum 6 characters)." });
+    }
+
+    const data = await loadData();
+    const admins = getRegisteredAdmins(data.users);
+    const existingAdmin = admins.find((a) => nameKey(a.name) === nameKey(name));
+
+    if (existingAdmin) {
+      // Returning Admin: verify personal password
+      if (hashPassword(adminPassword) !== existingAdmin.passwordHash) {
+        return res.status(401).json({ error: "Incorrect personal Admin password." });
+      }
+      pendingAdminPasswordHash = existingAdmin.passwordHash;
+    } else {
+      // First-time Admin sign-up: check 5-Admin cap + invite code
+      if (admins.length >= MAX_ADMINS) {
+        return res.status(403).json({
+          error: `Admin limit reached (${MAX_ADMINS} admins maximum). Please sign in as Member or Guest.`
+        });
+      }
+
+      if (!inviteCode || inviteCode !== ADMIN_INVITE_CODE) {
+        return res.status(403).json({
+          error: "Invalid Admin Invite Code for new Admin sign-up."
+        });
+      }
+
+      pendingAdminPasswordHash = hashPassword(adminPassword);
+    }
   }
 
   const pin = generateSixDigitPin();
@@ -146,7 +246,8 @@ app.post("/api/auth/request-pin", async (req, res) => {
     device,
     name,
     role,
-    pinHash: hashValue(pin),
+    adminPasswordHash: pendingAdminPasswordHash,
+    pinHash: hashPassword(pin),
     expiresAt,
     attempts: 0
   });
@@ -189,17 +290,30 @@ app.post("/api/auth/verify-pin", async (req, res) => {
     return res.status(429).json({ error: "Too many invalid attempts. Please request a new PIN." });
   }
 
-  if (hashValue(pin) !== entry.pinHash) {
+  if (hashPassword(pin) !== entry.pinHash) {
     entry.attempts += 1;
     return res.status(401).json({ error: "Incorrect PIN. Try again." });
   }
 
+  const data = await loadData();
+
+  // Double-check Admin slot cap at verification time in case two sign-ups raced
+  if (entry.role === "Admin") {
+    const admins = getRegisteredAdmins(data.users);
+    const alreadyExists = admins.some((a) => nameKey(a.name) === nameKey(entry.name));
+    if (!alreadyExists && admins.length >= MAX_ADMINS) {
+      pendingPins.delete(requestId);
+      return res.status(403).json({
+        error: `Admin limit reached (${MAX_ADMINS} admins maximum).`
+      });
+    }
+  }
+
   pendingPins.delete(requestId);
 
-  const data = await loadData();
   const existingIndex = data.users.findIndex(
     (u) =>
-      String(u.name || "").trim().toLowerCase() === entry.name.toLowerCase() &&
+      nameKey(u.name) === nameKey(entry.name) &&
       String(u.role || "").trim().toLowerCase() === entry.role.toLowerCase()
   );
 
@@ -210,6 +324,9 @@ app.post("/api/auth/verify-pin", async (req, res) => {
       name: entry.name,
       role: entry.role,
       device: entry.device,
+      ...(entry.role === "Admin" && entry.adminPasswordHash
+        ? { passwordHash: entry.adminPasswordHash }
+        : {}),
       lastLoginAt: new Date().toISOString()
     };
     data.users[existingIndex] = savedUser;
@@ -219,6 +336,9 @@ app.post("/api/auth/verify-pin", async (req, res) => {
       name: entry.name,
       role: entry.role,
       device: entry.device,
+      ...(entry.role === "Admin" && entry.adminPasswordHash
+        ? { passwordHash: entry.adminPasswordHash }
+        : {}),
       createdAt: new Date().toISOString(),
       lastLoginAt: new Date().toISOString()
     };
@@ -315,12 +435,7 @@ app.delete("/api/posts/:id", async (req, res) => {
   }
 
   const targetPost = data.posts[index];
-  const isAdmin = auth.user.role.toLowerCase() === "admin";
-  const isAuthor =
-    String(targetPost.author || "").trim().toLowerCase() ===
-    String(auth.user.name || "").trim().toLowerCase();
-
-  if (!isAdmin && !isAuthor) {
+  if (!canDeletePost(targetPost, auth.user)) {
     return res.status(403).json({ error: "Only Admins or the post author can delete this post." });
   }
 
