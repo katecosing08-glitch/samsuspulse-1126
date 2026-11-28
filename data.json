@@ -26,6 +26,7 @@
       "lastLoginAt": "2026-11-27T12:05:45.543Z"
     }
   ],
+  "usedInviteCodes": [],
   "posts": [
     {
       "id": 3,
@@ -34,8 +35,6 @@
       "title": "Cafe",
       "content": "Try BLK. 36 CAFEEEE",
       "timestamp": "11/27/2026, 8:06:25 PM"
-    },
-    {
     },
     {
       "id": 1,
