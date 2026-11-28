@@ -462,7 +462,6 @@
       banner.textContent = "";
       banner.style.display = "none";
     }
-
     async function handleDeletePost(postId) {
       clearError();
       const token = sessionStorage.getItem("samsuspulse_token");
@@ -474,17 +473,22 @@
             ...(token ? { Authorization: `Bearer ${token}` } : {})
           }
         });
-        const data = await res.json();
+        const rawText = await res.text();
+        let data = {};
+        try {
+          data = rawText ? JSON.parse(rawText) : {};
+        } catch {
+          data = { error: rawText.trim() || `Request failed (HTTP ${res.status})` };
+        }
         if (!res.ok) {
-          showError(data.error || "Could not delete post.");
+          showError(data.error || `Could not delete post (HTTP ${res.status}).`);
           return;
         }
         await loadPosts();
-      } catch {
-        showError("Network error while deleting post.");
+      } catch (err) {
+        showError(`Network error while deleting post: ${err?.message || "Connection failed"}`);
       }
     }
-
     function renderPosts(posts) {
       const feedList = document.getElementById("feed-list");
       const postCountEl = document.getElementById("post-count");
